@@ -4,6 +4,11 @@
  *
  *   npm run deploy               build apps/web/dist, then `wrangler deploy`
  *   npm run deploy -- --dry-run  build and validate the upload without publishing anything
+ *   npm run deploy -- --skip-build  deploy the existing apps/web/dist (used by CI)
+ *
+ * GitHub Actions deploys main through this script (job "deploy" in .github/workflows/ci.yml).
+ * Do not use Cloudflare's own Git integration (Workers Builds): it cannot build the WASM engine,
+ * so it fails with "assets.directory ... does not exist".
  *
  * Refuses to run unless wrangler.jsonc names the Worker "app" and pins an "account_id" that is
  * not a known shared account. The workers.dev subdomain is account-wide, so deploying into an
@@ -12,7 +17,7 @@
  * that wrangler reported the expected URL.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +31,7 @@ const FORBIDDEN_ACCOUNTS = {
 };
 
 const dryRun = process.argv.includes("--dry-run");
+const skipBuild = process.argv.includes("--skip-build");
 const fail = (msg) => {
   console.error(`[deploy] REFUSED: ${msg}`);
   process.exit(1);
@@ -63,20 +69,24 @@ if (typeof account !== "string" || !/^[0-9a-f]{32}$/.test(account))
 if (FORBIDDEN_ACCOUNTS[account])
   fail(`account ${account} is ${FORBIDDEN_ACCOUNTS[account]}; ArchFlow must use its own account.`);
 
-const run = (cmd, args) => {
-  const r = spawnSync(cmd, args, {
-    cwd: root,
-    encoding: "utf8",
-    shell: process.platform === "win32",
-    stdio: ["inherit", "pipe", "inherit"],
-  });
+/** Run a fixed command (no user input reaches it), capturing stdout. */
+const run = (label, r) => {
   process.stdout.write(r.stdout ?? "");
-  if (r.status !== 0) fail(`${cmd} ${args.join(" ")} exited with ${r.status}`);
+  if (r.status !== 0) fail(`${label} exited with ${r.status}`);
   return r.stdout ?? "";
 };
+const opts = { cwd: root, encoding: "utf8", stdio: ["inherit", "pipe", "inherit"] };
+/** Exact wrangler version (docs/architecture/DEPENDENCY_DECISIONS.md); not an npm dependency. */
+const WRANGLER = "wrangler@4.168.0";
 
-run(process.execPath, [resolve(root, "apps/web/build.mjs")]);
-const out = run("npx", ["wrangler", "deploy", ...(dryRun ? ["--dry-run"] : [])]);
+if (skipBuild) {
+  // CI deploys the dist it already built and tested (artifact archflow-web-dist)
+  if (!existsSync(resolve(root, "apps/web/dist/index.html")))
+    fail("--skip-build given but apps/web/dist/index.html does not exist.");
+} else run("web build", spawnSync(process.execPath, [resolve(root, "apps/web/build.mjs")], opts));
+// npx is a .cmd shim on Windows, so it needs a shell; the command is a constant string
+const deployCmd = `npx --yes ${WRANGLER} deploy${dryRun ? " --dry-run" : ""}`;
+const out = run(deployCmd, spawnSync(deployCmd, { ...opts, shell: true }));
 if (dryRun) {
   console.log(`[deploy] dry run OK for account ${account}; nothing was published.`);
 } else {

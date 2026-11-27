@@ -1,6 +1,6 @@
 # Deployment (Cloudflare Workers Static Assets)
 
-**Target URL:** <https://app.archflow-ai.workers.dev>. **Status:** migration prepared but not yet carried out. Nothing changes on Cloudflare until the owner completes the manual steps below.
+**Target URL:** <https://app.archflow-ai.workers.dev>. **Status:** the dedicated account exists (ID `cd9e6a7f…`, pinned in `wrangler.jsonc`), and GitHub Actions deploys `main` to it after the owner's approval. The first deploy is waiting for the owner steps in the [migration checklist](#migration-checklist).
 
 | | Current (interim) | Target |
 | --- | --- | --- |
@@ -47,15 +47,27 @@ Security and caching headers come from `apps/web/dist/_headers`, which `npm run 
 - `index.html` is never cached;
 - `/assets/*` is cached for one year (immutable, because names are content-hashed).
 
-## Deploying: always `npm run deploy`
+## How deployment works
 
-`scripts/deploy-web.mjs` builds the site and runs `wrangler deploy`. It refuses to run when:
+**Normal path: GitHub Actions.** The `deploy` job in `.github/workflows/ci.yml` runs on every push to `main`, in this order:
 
-- `wrangler.jsonc` `name` is not `app`;
-- `account_id` is missing;
-- `account_id` is the shared account.
+1. It waits until every CI job has passed, including the engine build and the browser tests on ubuntu.
+2. It waits for an approval in the GitHub environment **`production`**. The required reviewer is the repository owner, and only `main` may deploy.
+3. It downloads the exact `apps/web/dist` the ubuntu job built and tested (artifact `archflow-web-dist`).
+4. It runs `npm run deploy -- --skip-build` with the `CLOUDFLARE_API_TOKEN` secret.
+5. It runs the full end-to-end suite against the live URL.
 
-After a real deploy, it exits with code 2 if wrangler did not report `https://app.archflow-ai.workers.dev`. `npm run deploy -- --dry-run` validates the build and upload without publishing anything.
+**Do not use Cloudflare's own Git integration (Workers Builds).**
+- It runs `wrangler deploy` on an unbuilt checkout. `apps/web/dist` is not in git: it needs the WASM engine build (Emscripten, pinned upstream), which Workers Builds does not do.
+- It fails with `The directory specified by the "assets.directory" field ... does not exist: /opt/buildhome/repo/apps/web/dist`.
+
+**The guard: `npm run deploy` (`scripts/deploy-web.mjs`).** CI and manual deploys both go through it.
+- It runs the exact wrangler version 4.168.0.
+- It refuses to run when the `name` is not `app`, when `account_id` is missing, or when `account_id` is the shared account.
+- After a real deploy, it exits with code 2 if wrangler did not report `https://app.archflow-ai.workers.dev`.
+- `--dry-run` validates the build and upload without publishing.
+- `--skip-build` deploys the existing `dist`.
+- For a manual deploy from a PC, wrangler must be logged in to the dedicated account (`npx wrangler login`, then `npx wrangler whoami` lists it), or `CLOUDFLARE_API_TOKEN` must be set.
 
 ## Manual Cloudflare dashboard steps (owner)
 
@@ -74,19 +86,17 @@ After a real deploy, it exits with code 2 if wrangler did not report `https://ap
 
 ## Migration checklist
 
-- [ ] Steps 1–4 above done; new Account ID noted.
-- [ ] `wrangler.jsonc`: uncomment `account_id` and set it to the new Account ID.
-- [ ] Let wrangler reach the new account. Either option works:
-  - **Same login:** `npx wrangler whoami` lists both accounts; the pinned `account_id` selects the right one.
-  - **Separate login:** `npx wrangler logout`, then `npx wrangler login` as the new user.
-  - **Alternative:** an API token limited to that account, with "Edit Cloudflare Workers" permission, in `CLOUDFLARE_API_TOKEN`.
-- [ ] `npm run ci` passes.
-- [ ] `npm run deploy -- --dry-run` passes.
-- [ ] **Owner approval for the real deploy**, then `npm run deploy`.
-- [ ] Validation below passes against `https://app.archflow-ai.workers.dev`.
+- [x] Dedicated account created (2026-11-27); `account_id` `cd9e6a7f8d05ccfc5de8d27f3e33c53b` pinned in `wrangler.jsonc`.
+- [x] GitHub environment `production` created: the owner must approve each deploy, and only `main` may deploy.
+- [x] `npm run deploy -- --dry-run` passes for the new account.
+- [ ] **Disconnect Workers Builds** in the new account. In the Worker created by the Git import: **Settings → Build → Disconnect**. Delete that Worker too if it never deployed.
+- [ ] **Set the workers.dev subdomain** of the new account to `archflow-ai` (dashboard step 2 above).
+- [ ] **Create an API token.** Go to My Profile → **API Tokens** → Create Token, use the template **"Edit Cloudflare Workers"**, and set Account Resources to *Include → the ArchFlow account only*.
+- [ ] **Store it in GitHub, never in chat or the repo.** Use repo **Settings → Environments → production → Add environment secret**, name `CLOUDFLARE_API_TOKEN`. Or run `gh secret set CLOUDFLARE_API_TOKEN --env production -R anjinapp-aryan/ArchFlow-AI`, which prompts for the value.
+- [ ] Re-run the latest CI run on `main` (or push), then **approve** the `deploy` job when GitHub asks.
+- [ ] The `deploy` job's smoke test passes; repeat the validation below by hand if wanted.
 - [ ] Update the URL wherever it was shared.
 - [ ] **Separate owner approval:** delete the interim Worker. Logged in to the shared account, run `npx wrangler delete --name archflow-ai`, which removes only that Worker. Re-check the other project's Worker still serves afterwards.
-- [ ] Optional, for CI deploys later: GitHub repository secrets `CLOUDFLARE_API_TOKEN` (scoped as above) and `CLOUDFLARE_ACCOUNT_ID`. CI does not deploy today.
 
 Secrets, bindings and environment variables to migrate: **none**. Static assets configuration: `wrangler.jsonc` `assets` block plus `_headers`, both in the repo.
 
@@ -126,3 +136,4 @@ The site ran under `wrangler dev` with `wrangler` 4.168.0 and the real `workerd`
   - Version `552a2afb-6c49-4fe2-a72a-7a1f157eda10`.
   - `smoke:live` passed 8/8.
 - 2026-11-27: the URL was rejected because it carried another project's name. Migration to a dedicated account was prepared.
+- 2026-11-27: dedicated account created by the owner. A deploy through Cloudflare Workers Builds failed (no build of `apps/web/dist`). Deployment moved to the GitHub Actions `deploy` job, behind the `production` environment approval.

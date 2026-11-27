@@ -86,3 +86,43 @@ jobs:
             build/engine/manifest.json
             build/engine/link-inputs.txt
             artifacts/golden-candidates/
+
+  deploy:
+    # Publishes the dist that the ubuntu engine job built and tested. Cloudflare's own Git
+    # integration (Workers Builds) cannot build the WASM engine, so deployment runs here.
+    # The "production" environment holds the secret and can require an approval per deploy.
+    name: Deploy to Cloudflare (app.archflow-ai.workers.dev)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, engine]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.archflow-ai.workers.dev
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download the tested site
+        uses: actions/download-artifact@v4
+        with:
+          name: archflow-web-dist
+          path: apps/web/dist
+      - name: Deploy (guarded; account pinned in wrangler.jsonc)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN is missing in environment 'production' (see docs/architecture/DEPLOYMENT.md)."
+            exit 1
+          fi
+          npm run deploy -- --skip-build
+      - name: Smoke test the live site (full web app end to end)
+        env:
+          ARCHFLOW_BASE_URL: https://app.archflow-ai.workers.dev
+        run: npm run smoke:live

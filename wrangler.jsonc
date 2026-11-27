@@ -5,11 +5,11 @@
 // Target URL: https://app.archflow-ai.workers.dev = Worker name "app" + account workers.dev
 // subdomain "archflow-ai". The subdomain is an ACCOUNT setting, so ArchFlow needs its own
 // Cloudflare account (the first deployment shared an account with another project).
-// Deploy only with `npm run deploy`, which refuses to run until "account_id" below names the
-// dedicated ArchFlow account. See docs/architecture/DEPLOYMENT.md.
+// Deploy only with `npm run deploy` (GitHub Actions job "deploy" runs it on main). It refuses
+// any account other than the dedicated one below. See docs/architecture/DEPLOYMENT.md.
 {
   "name": "app",
-  // "account_id": "<dedicated ArchFlow account id, 32 hex characters>",
+  "account_id": "cd9e6a7f8d05ccfc5de8d27f3e33c53b",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./apps/web/dist",
