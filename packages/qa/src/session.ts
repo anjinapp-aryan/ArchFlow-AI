@@ -144,6 +144,97 @@ export async function renderDisplayLists(
   }
 }
 
+export interface DisplayListJob {
+  json: string;
+  times: number[];
+}
+export interface DisplayListJobResult {
+  ok: boolean;
+  error?: string;
+  /** Digest of each frame's display list (data and strings), in `times` order. */
+  hashes: string[];
+  bounds?: [number, number, number, number];
+  durationMs?: number;
+}
+
+/**
+ * Many documents in one page (deterministic text metrics, like `renderDisplayLists`): for
+ * temporal assertions that compare an animation with and without one event.
+ */
+export async function renderDisplayListBatch(
+  browser: Browser,
+  art: EngineArtifacts,
+  jobs: DisplayListJob[],
+): Promise<DisplayListJobResult[]> {
+  const page = await browser.newPage();
+  try {
+    await page.setContent("<!doctype html><meta charset=utf-8><title>qa</title>");
+    await page.addScriptTag({ content: art.engineJs });
+    await page.addScriptTag({ content: art.hostBundle });
+    return await page.evaluate(async (js: DisplayListJob[]) => {
+      const g = globalThis as unknown as {
+        AdPlayerEngine: unknown;
+        ArchFlowEngineHost: {
+          EngineHost: {
+            create(
+              f: unknown,
+              m: unknown,
+            ): Promise<{
+              load(json: string):
+                | {
+                    ok: true;
+                    info: { durationMs: number; bounds: [number, number, number, number] };
+                  }
+                | { ok: false; error: string };
+              frame(t: number): { data: Float64Array; strings: Uint8Array };
+            }>;
+          };
+          deterministicMeasureText: unknown;
+        };
+      };
+      const host = await g.ArchFlowEngineHost.EngineHost.create(
+        g.AdPlayerEngine,
+        g.ArchFlowEngineHost.deterministicMeasureText,
+      );
+      // about:blank is not a secure context (no crypto.subtle): two independent 32-bit FNV-1a
+      // lanes are plenty to tell frames apart
+      const digest = (u8: Uint8Array): string => {
+        let h1 = 0x811c9dc5;
+        let h2 = 0x01000193 ^ u8.length;
+        for (let i = 0; i < u8.length; i++) {
+          h1 = Math.imul(h1 ^ u8[i]!, 0x01000193);
+          h2 = Math.imul(h2 ^ u8[i]!, 0x5bd1e995) ^ (h2 >>> 15);
+        }
+        return (
+          (h1 >>> 0).toString(16).padStart(8, "0") +
+          (h2 >>> 0).toString(16).padStart(8, "0") +
+          u8.length.toString(16)
+        );
+      };
+      const out = [];
+      for (const j of js) {
+        const r = host.load(j.json);
+        if (!r.ok) {
+          out.push({ ok: false, error: String(r.error), hashes: [] });
+          continue;
+        }
+        const hashes: string[] = [];
+        for (const t of j.times) {
+          const f = host.frame(t);
+          const buf = new Uint8Array(f.data.byteLength + 1 + f.strings.byteLength);
+          buf.set(new Uint8Array(f.data.buffer, f.data.byteOffset, f.data.byteLength), 0);
+          buf.set(f.strings, f.data.byteLength + 1);
+          hashes.push(digest(buf));
+        }
+        out.push({ ok: true, hashes, bounds: r.info.bounds, durationMs: r.info.durationMs });
+      }
+      return out;
+    }, jobs);
+  } finally {
+    await page.close();
+  }
+}
+
 export interface PixelFrame {
   t: number;
   sha256: string;

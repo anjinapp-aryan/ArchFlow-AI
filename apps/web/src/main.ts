@@ -10,11 +10,14 @@ import {
   detectKind,
   eventTimes,
   prepare,
+  restyled,
+  type RenderStyle,
   type Issue,
   type Prepared,
   type SourceKind,
   type UserScenarioOptions,
 } from "./pipeline.ts";
+import { isThemeId, type ThemeId } from "@archflow/renderer-adapter";
 import { Player } from "./player.ts";
 import { SAMPLES } from "./samples.ts";
 
@@ -53,6 +56,9 @@ const ui = {
   zoomIn: $<HTMLButtonElement>("zoom-in"),
   zoomOut: $<HTMLButtonElement>("zoom-out"),
   zoomFit: $<HTMLButtonElement>("zoom-fit"),
+  autoCamera: $<HTMLInputElement>("auto-camera"),
+  theme: $<HTMLSelectElement>("theme"),
+  dim: $<HTMLInputElement>("dim"),
   placeholder: $<HTMLParagraphElement>("placeholder"),
   prev: $<HTMLButtonElement>("prev"),
   back: $<HTMLButtonElement>("back"),
@@ -150,13 +156,14 @@ async function run(options: UserScenarioOptions | undefined, keepControls: boole
   if (!player) return;
   ui.animate.disabled = true;
   try {
-    const r = await prepare(kind, ui.source.value, options ?? {}, player.measureTitle);
+    const r = await prepare(kind, ui.source.value, options ?? {}, player.measureTitle, style());
     showIssues(r.issues);
     if (!r.ok) {
       ui.origin.textContent = "Fix the errors below, then animate again.";
       return;
     }
     const loaded = player.load(r.engineJson);
+    if (loaded.ok) player.setCameraDocument(r.document);
     updateZoom();
     if (!loaded.ok) {
       showIssues([...r.issues, { level: "error", code: "engine.load", message: loaded.error }]);
@@ -173,6 +180,32 @@ async function run(options: UserScenarioOptions | undefined, keepControls: boole
   } finally {
     ui.animate.disabled = false;
   }
+}
+
+const style = (): RenderStyle => ({
+  theme: isThemeId(ui.theme.value) ? (ui.theme.value as ThemeId) : "default",
+  dimInactive: ui.dim.checked,
+});
+
+/** Switch theme or dimming of the current animation, keeping its position and play state. */
+function applyStyle(): void {
+  if (!player || !current) return;
+  const r = restyled(current.document, style(), player.measureTitle);
+  if (!r.ok) {
+    showIssues([...current.issues, ...r.issues]);
+    return;
+  }
+  const at = player.time;
+  const playing = player.isPlaying;
+  const loaded = player.load(r.engineJson);
+  if (!loaded.ok) {
+    showIssues([...current.issues, { level: "error", code: "engine.load", message: loaded.error }]);
+    return;
+  }
+  player.setCameraDocument(current.document);
+  player.seek(at);
+  if (playing) player.play();
+  updateZoom();
 }
 
 function updateTransport(): void {
@@ -236,10 +269,12 @@ async function doExport(): Promise<void> {
     let blob: Blob;
     if (webCodecsAvailable()) {
       ui.exportMsg.textContent = "Rendering…";
+      const camera = player.autoCamera ? player.cameraPlanFor(w, h) : undefined;
       blob = await exportVideo({
         engine: player.engine,
         text: player.text,
         hiddenMarkers: player.hiddenMarkers,
+        ...(camera ? { camera } : {}),
         format,
         width: w,
         height: h,
@@ -399,6 +434,12 @@ function wire(): void {
     player?.zoomBy(1 / 1.4);
     updateZoom();
   });
+  ui.theme.addEventListener("change", applyStyle);
+  ui.dim.addEventListener("change", applyStyle);
+  ui.autoCamera.addEventListener("change", () => {
+    if (player) player.autoCamera = ui.autoCamera.checked;
+    updateZoom();
+  });
   ui.zoomFit.addEventListener("click", () => {
     player?.resetView();
     updateZoom();
@@ -479,6 +520,9 @@ async function main(): Promise<void> {
   try {
     player = await Player.create(ui.canvas);
     player.onChange = updateTransport;
+    player.onCameraChange = (on) => {
+      ui.autoCamera.checked = on;
+    };
   } catch (e) {
     showIssues([{ level: "error", code: "app.engine", message: (e as Error).message }]);
     ui.animate.disabled = true;

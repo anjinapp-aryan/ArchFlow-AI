@@ -100,13 +100,27 @@ export type EngineStep =
       text: string;
       x: number;
       y: number;
+    }
+  | {
+      /** Node effect (opacity/scale/glow keyframes), built-in or from the document library. */
+      id: string;
+      type: "effect";
+      start: number;
+      duration: number;
+      nodeId: string;
+      effect: string;
+      intensity?: number;
     };
 
 export interface EngineDocument {
   version: typeof ENGINE_DOCUMENT_VERSION;
   meta: { name: string; description?: string; createdAt: 0 };
   view: { zoom: 1; panX: 0; panY: 0 };
-  scene?: { background: string };
+  scene?: { background: string; edgeColor?: string; textColor?: string };
+  /** Engine design system (built-in id) the engine resolves node, state and packet colours from. */
+  designSystem?: string;
+  /** Document library: ArchFlow's own design systems and effects (never the engine's ids). */
+  library?: { designSystems?: Record<string, unknown>[]; effects?: Record<string, unknown>[] };
   nodes: EngineNode[];
   edges: EngineEdge[];
   scenario: { duration: number; userDuration: true; steps: EngineStep[] };

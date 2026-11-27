@@ -24,6 +24,7 @@
     "test:browser": "vitest run --project browser",
     "smoke:live": "vitest run --project browser apps/web/test/app.browser.test.ts",
     "golden:update": "node scripts/golden-update.mjs",
+    "golden:sheet": "node scripts/golden-sheet.mjs",
     "licenses:check": "node scripts/check-licenses.mjs",
     "licenses:collect": "node scripts/collect-licenses.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test && npm run licenses:check",

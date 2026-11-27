@@ -15,7 +15,9 @@ import {
   type EngineStep,
   type EngineNode,
 } from "./engine-document.ts";
-import { CONNECTOR_COLORS, PROBE_PACKET, connectorStyle } from "./connector-style.ts";
+import { PROBE_PACKET, connectorStyle } from "./connector-style.ts";
+import { THEMES, type ThemeId } from "./themes.ts";
+import { DIM_HOLD_EFFECT, dimSteps } from "./dim.ts";
 
 export interface AdaptError {
   /** `validation.*` (input invalid) or `unsupported.*` (valid input the engine cannot represent). */
@@ -38,9 +40,17 @@ export interface AdaptOptions {
    * estimate is used.
    */
   measureTitle?: TitleMeasurer;
+  /**
+   * Visual theme (engine design system). `default` (or none) leaves the document exactly as
+   * before themes existed. A theme's background replaces the diagram's own background.
+   */
+  theme?: ThemeId;
+  /** Fade components that are not involved in what is happening (engine node effects). */
+  dimInactive?: boolean;
 }
 
-export type TitleMeasurer = (label: string, fontPx: number) => number;
+/** Width of `label` drawn bold at `fontPx` in font `family` ("" = the default stack). */
+export type TitleMeasurer = (label: string, fontPx: number, family?: string) => number;
 
 export type AdaptResult =
   | { ok: true; document: EngineDocument; warnings: AdaptError[] }
@@ -73,6 +83,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
   const warnings: AdaptError[] = [];
   const { diagram, scenario } = doc;
   const flatten = options.groups === "flatten";
+  const theme = THEMES[options.theme ?? "default"];
 
   if (flatten && diagram.groups.length > 0)
     warnings.push({
@@ -111,7 +122,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     w: n.w,
     h: n.h,
     ...(n.subtitle !== undefined ? { subtitle: n.subtitle } : {}),
-    ...fitTitle(n.label, n.kind, n.w, options.measureTitle),
+    ...fitTitle(n.label, n.kind, n.w, options.measureTitle, theme.fontFamily),
   }));
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -170,7 +181,8 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
       ...(toPort !== undefined ? { toPort } : {}),
       ...(e.labelPos !== undefined ? { labelPos: e.labelPos } : {}),
       ...(e.labelOffset !== undefined ? { labelOff: e.labelOffset } : {}),
-      style: e.interaction !== undefined ? connectorStyle(e.interaction, base) : base,
+      style:
+        e.interaction !== undefined ? connectorStyle(e.interaction, base, theme.connectors) : base,
     };
   });
   const edgeById = new Map(diagram.edges.map((e) => [e.id, e]));
@@ -200,7 +212,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
             ? {
                 packet: ev.shape ?? PROBE_PACKET.packet,
                 packetSize: PROBE_PACKET.packetSize,
-                color: PROBE_PACKET.color,
+                color: theme.connectors.monitoring,
                 trail: PROBE_PACKET.trail,
               }
             : ev.shape !== undefined
@@ -218,7 +230,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
             duration: ev.durationMs,
             edgeId,
             anim: "flow",
-            color: CONNECTOR_COLORS.async,
+            color: theme.connectors.async,
           });
         break;
       }
@@ -258,6 +270,18 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
         break;
     }
   }
+  const dimmed = options.dimInactive
+    ? dimSteps(doc, (id) => {
+        let u = id;
+        while (usedIds.has(u)) u += "'";
+        usedIds.add(u);
+        return u;
+      })
+    : [];
+  if (dimmed.length > 0) {
+    steps.push(...dimmed);
+    steps.sort((a, b) => a.start - b.start);
+  }
   if (usedFlow)
     warnings.push({
       code: "info.flow_ids_not_rendered",
@@ -265,6 +289,12 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
       message: "flowId is kept in the canonical model only; the engine has no flow concept",
     });
 
+  const library = {
+    ...(theme.library ? { designSystems: [theme.library] } : {}),
+    ...(dimmed.length > 0
+      ? { effects: [DIM_HOLD_EFFECT as unknown as Record<string, unknown>] }
+      : {}),
+  };
   const document: EngineDocument = {
     version: ENGINE_DOCUMENT_VERSION,
     meta: {
@@ -273,7 +303,15 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
       createdAt: 0,
     },
     view: { zoom: 1, panX: 0, panY: 0 },
-    ...(diagram.background !== undefined ? { scene: { background: diagram.background } } : {}),
+    ...(theme.scene
+      ? {
+          scene: { ...theme.scene },
+          designSystem: theme.designSystem!,
+        }
+      : diagram.background !== undefined
+        ? { scene: { background: diagram.background } }
+        : {}),
+    ...(Object.keys(library).length > 0 ? { library } : {}),
     nodes,
     edges,
     scenario: { duration: scenario.durationMs, userDuration: true, steps },
@@ -309,7 +347,7 @@ export function assertEngineSafe(doc: EngineDocument): AdaptError[] {
     if (s.start + s.duration > doc.scenario.duration) bad(p, "step ends after the scenario");
     if (s.type === "message" && (!nodes.has(s.from) || !nodes.has(s.to)))
       bad(p, "message references an unknown node");
-    if ((s.type === "state" || s.type === "timer") && !nodes.has(s.nodeId))
+    if ((s.type === "state" || s.type === "timer" || s.type === "effect") && !nodes.has(s.nodeId))
       bad(p, "step references an unknown node");
     if (s.type === "link" && !doc.edges.some((e) => e.id === s.edgeId))
       bad(p, "edge animation references an unknown edge");
@@ -336,9 +374,12 @@ export function fitTitle(
   kind: string,
   w: number,
   measure?: TitleMeasurer,
+  family = "",
 ): { style?: { fontSize: number } } {
   const room = titleRoom(kind, w);
-  const width = measure ?? ((text: string, px: number) => titleWidth(text, px));
+  const width = measure
+    ? (text: string, px: number) => measure(text, px, family)
+    : (text: string, px: number) => titleWidth(text, px);
   const need = width(label, TITLE_FONT_PX);
   if (need <= room) return {};
   let px = Math.max(MIN_TITLE_PX, Math.floor(((TITLE_FONT_PX * room) / need) * 2) / 2);

@@ -8,6 +8,7 @@ import {
 import {
   serializeEngineDocument,
   toEngineDocument,
+  type ThemeId,
   type TitleMeasurer,
 } from "@archflow/renderer-adapter";
 import {
@@ -90,6 +91,8 @@ export async function prepare(
   user: UserScenarioOptions = {},
   /** Real title widths from the browser canvas; titles then fit the fonts this machine has. */
   measureTitle?: TitleMeasurer,
+  /** Presentation: theme (engine design system) and dimming; the default look when omitted. */
+  style: RenderStyle = {},
 ): Promise<PrepareResult> {
   const issues: Issue[] = [];
   let diagram: CanonicalDocument;
@@ -148,6 +151,7 @@ export async function prepare(
   const a = toEngineDocument(document, {
     groups: "flatten",
     ...(measureTitle ? { measureTitle } : {}),
+    ...styleOptions(style),
   });
   if (!a.ok) return { ok: false, issues: [...issues, ...a.errors.map(err)] };
   issues.push(...a.warnings.filter((w) => w.code !== "info.flow_ids_not_rendered").map(warn));
@@ -187,4 +191,29 @@ export function callPairs(doc: CanonicalDocument): { from: string; to: string; l
       push(e.to, e.from);
   }
   return out;
+}
+
+/** How the animation is drawn (never what it shows). */
+export interface RenderStyle {
+  theme?: ThemeId;
+  dimInactive?: boolean;
+}
+const styleOptions = (s: RenderStyle): { theme?: ThemeId; dimInactive?: boolean } => ({
+  ...(s.theme ? { theme: s.theme } : {}),
+  ...(s.dimInactive ? { dimInactive: true } : {}),
+});
+
+/** Engine document for an already prepared canonical document in another style. */
+export function restyled(
+  document: CanonicalDocument,
+  style: RenderStyle,
+  measureTitle?: TitleMeasurer,
+): { ok: true; engineJson: string } | { ok: false; issues: Issue[] } {
+  const a = toEngineDocument(document, {
+    groups: "flatten",
+    ...styleOptions(style),
+    ...(measureTitle ? { measureTitle } : {}),
+  });
+  if (!a.ok) return { ok: false, issues: a.errors.map(err) };
+  return { ok: true, engineJson: serializeEngineDocument(a.document) };
 }

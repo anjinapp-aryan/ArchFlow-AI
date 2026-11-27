@@ -1,5 +1,6 @@
 import type { Interaction } from "@archflow/canonical-model";
 import type { EngineEdgeStyle } from "./engine-document.ts";
+import type { ConnectorPalette } from "./themes.ts";
 
 /**
  * Visual language for connector semantics (canonical `interaction`, minor 2). Applied only when a
@@ -17,7 +18,11 @@ export const CONNECTOR_COLORS = {
   response: "#94a3b8",
 } as const;
 
-export function connectorStyle(interaction: Interaction, base: EngineEdgeStyle): EngineEdgeStyle {
+export function connectorStyle(
+  interaction: Interaction,
+  base: EngineEdgeStyle,
+  colors: ConnectorPalette = CONNECTOR_COLORS,
+): EngineEdgeStyle {
   switch (interaction) {
     case "sync_request":
       return { ...base, strokeStyle: "solid" };
@@ -28,16 +33,16 @@ export function connectorStyle(interaction: Interaction, base: EngineEdgeStyle):
         ...base,
         strokeStyle: "dashed",
         ...(base.arrowEnd !== "none" ? { arrowEnd: "open" } : {}),
-        color: CONNECTOR_COLORS.monitoring,
+        color: colors.monitoring,
         width: 1.5,
-        labelColor: CONNECTOR_COLORS.monitoringLabel,
+        labelColor: colors.monitoringLabel,
       };
     case "response":
       return {
         ...base,
         strokeStyle: "dashed",
         ...(base.arrowEnd !== "none" ? { arrowEnd: "open" } : {}),
-        color: CONNECTOR_COLORS.response,
+        color: colors.response,
       };
   }
 }

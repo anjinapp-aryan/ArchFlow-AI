@@ -6,7 +6,15 @@ import {
   REF_PX,
   type EngineFactory,
 } from "@archflow/engine-host";
-import type { TitleMeasurer } from "@archflow/renderer-adapter";
+import type { CanonicalDocument } from "@archflow/canonical-model";
+import {
+  planCamera,
+  type Bounds,
+  type CameraOptions,
+  type CameraPlan,
+  type TitleMeasurer,
+} from "@archflow/renderer-adapter";
+import { aspectKey, cameraFrameBounds } from "./framing.ts";
 
 /**
  * Interactive player: our own clock drives the WASM engine and our painter draws each frame,
@@ -49,8 +57,8 @@ export class Player {
   }
 
   /** Bold title width at `fontPx`, measured exactly as the painter draws titles. */
-  readonly measureTitle: TitleMeasurer = (label, fontPx) =>
-    (this.text.measure(label, true, "") * fontPx) / REF_PX;
+  readonly measureTitle: TitleMeasurer = (label, fontPx, family = "") =>
+    (this.text.measure(label, true, family) * fontPx) / REF_PX;
 
   /** Port markers of the loaded document, hidden when painting (also used by video export). */
   hiddenMarkers: ReadonlySet<string> = new Set();
@@ -64,6 +72,8 @@ export class Player {
     }
     this.durationMs = r.info.durationMs;
     this.hiddenMarkers = portMarkerKeys(engineJson);
+    this.cameraDoc = undefined;
+    this.plan = undefined;
     this.resetView();
     this.t = 0;
     this.requestRender();
@@ -125,7 +135,65 @@ export class Player {
     if (this.playing) this.requestRender();
   }
 
-  // --- view: zoom and pan (playback only; export always renders the whole diagram) ------------
+  // --- automatic camera (shared with video export through cameraFrameBounds) ------------------
+  private cameraDoc: CanonicalDocument | undefined;
+  private plan: { key: string; plan: CameraPlan } | undefined;
+  private auto = true;
+  cameraOptions: Partial<CameraOptions> = {};
+  /** Called when the automatic camera is switched on or off (also by a manual zoom or pan). */
+  onCameraChange: ((on: boolean) => void) | undefined;
+
+  /** The canonical document of the loaded animation: the camera plans from it. */
+  setCameraDocument(doc: CanonicalDocument): void {
+    this.cameraDoc = doc;
+    this.plan = undefined;
+    this.requestRender();
+  }
+
+  get autoCamera(): boolean {
+    return this.auto;
+  }
+  set autoCamera(on: boolean) {
+    if (on === this.auto) return;
+    this.auto = on;
+    if (on) this.zoom = 1;
+    this.onCameraChange?.(on);
+    this.requestRender();
+  }
+
+  /** Camera plan for a viewport of this size (cached per aspect ratio and content bounds). */
+  cameraPlanFor(width: number, height: number): CameraPlan | undefined {
+    const info = this.engine.loaded;
+    if (!info || !this.cameraDoc) return undefined;
+    const key = `${aspectKey(width, height)}|${info.bounds.join(",")}|${JSON.stringify(this.cameraOptions)}`;
+    if (this.plan?.key !== key)
+      this.plan = {
+        key,
+        plan: planCamera(
+          this.cameraDoc,
+          info.bounds,
+          width / Math.max(1, height),
+          info.durationMs,
+          this.cameraOptions,
+        ),
+      };
+    return this.plan.plan;
+  }
+
+  /** True when the automatic camera frames this animation (on, and the diagram is large enough). */
+  get cameraActive(): boolean {
+    const p = this.cameraPlanFor(this.canvas.clientWidth || 16, this.canvas.clientHeight || 9);
+    return this.auto && this.zoom <= 1 && p?.enabled === true;
+  }
+
+  /** World rectangle shown now: manual zoom, the automatic camera, or the whole diagram. */
+  private currentBounds(b: Bounds): Bounds {
+    if (this.zoom > 1 || !this.auto) return this.viewBounds(b);
+    const p = this.cameraPlanFor(this.canvas.clientWidth || 16, this.canvas.clientHeight || 9);
+    return cameraFrameBounds(b, p, this.t);
+  }
+
+  // --- view: manual zoom and pan (playback only) ----------------------------------------------
   private zoom = 1;
   private cx = 0;
   private cy = 0;
@@ -149,7 +217,7 @@ export class Player {
   private toWorld(px: number, py: number): { x: number; y: number } | undefined {
     const info = this.engine.loaded;
     if (!info) return undefined;
-    const [bx, by, bw, bh] = this.viewBounds(info.bounds);
+    const [bx, by, bw, bh] = this.currentBounds(info.bounds);
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
     const k = Math.min(cw / bw, ch / bh);
@@ -172,6 +240,7 @@ export class Player {
     if (!info) return;
     const sx = px ?? this.canvas.clientWidth / 2;
     const sy = py ?? this.canvas.clientHeight / 2;
+    this.takeOverFromCamera(info.bounds);
     const before = this.toWorld(sx, sy)!;
     this.zoom = Math.min(Player.MAX_ZOOM, Math.max(1, this.zoom * factor));
     const after = this.toWorld(sx, sy)!;
@@ -182,12 +251,24 @@ export class Player {
 
   /** Pan by a drag of (dx, dy) CSS pixels. */
   panBy(dx: number, dy: number): void {
+    const info = this.engine.loaded;
+    if (info) this.takeOverFromCamera(info.bounds);
     const a = this.toWorld(0, 0);
     const b = this.toWorld(dx, dy);
     if (!a || !b || this.zoom <= 1) return;
     this.cx -= b.x - a.x;
     this.cy -= b.y - a.y;
     this.requestRender();
+  }
+
+  /** A manual zoom or pan switches the automatic camera off, starting from what it showed. */
+  private takeOverFromCamera(b: Bounds): void {
+    if (!this.cameraActive) return;
+    const [x, y, w, h] = this.currentBounds(b);
+    this.cx = x + w / 2;
+    this.cy = y + h / 2;
+    this.zoom = Math.min(Player.MAX_ZOOM, Math.max(1, Math.min(b[2] / w, b[3] / h)));
+    this.autoCamera = false;
   }
 
   render(): void {
@@ -207,7 +288,7 @@ export class Player {
       {
         width: w,
         height: h,
-        bounds: this.viewBounds(info.bounds),
+        bounds: this.currentBounds(info.bounds),
         background: info.background || "#0a111f",
         hiddenMarkers: this.hiddenMarkers,
       },

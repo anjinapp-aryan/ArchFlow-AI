@@ -9,11 +9,13 @@ Static single-page app. Everything happens on the user's device: import, scenari
 | Input | Tabs for **Describe** (text/sentences), **Mermaid**, **draw.io** (also `.svg` with an embedded diagram), **PlantUML**, **JSON** (canonical). Paste, open a file or drag and drop. Content is auto-detected. 10 examples |
 | Scenario | Generated automatically from the diagram, or taken from the source (sequence diagrams, JSON). Options: start component; failure on any caller → callee pair (timeout or error); number of retries; "generate from diagram" for sources that already have a scenario |
 | Playback | Play/pause, frame step (`,` `.`), ±1 s (←/→), previous/next event (Shift+←/→, ⏮ ⏭), seek bar, Home/End, speed 0.25×–4×, loop. Click the animation to toggle |
-| Zoom | Mouse wheel (zooms at the cursor), − / Fit / + buttons, keys `+` `-` `0`, double-click to fit, drag to pan, up to 8×. Large diagrams stay readable. Export always renders the whole diagram |
+| Auto camera | On by default. In diagrams with more than 6 components the view follows what is happening (zoom up to 2.2×, each stop held at least 1 s, one move at a time, starts and ends on the whole diagram) and video export uses the same camera. A manual zoom or pan switches it off; tick **Auto camera** to resume. See [CAMERA_THEMES_QA.md](CAMERA_THEMES_QA.md) |
+| Zoom | Mouse wheel (zooms at the cursor), − / Fit / + buttons, keys `+` `-` `0`, double-click to fit, drag to pan, up to 8×. Large diagrams stay readable. Export renders the whole diagram, or follows the auto camera when it is on |
+| Theme | Default (today's look), Light, Dark, Blueprint, High contrast: the engine's own design systems; used by playback and export. **Dim inactive** (off by default) fades components not involved in what is happening |
 | Messages | Every importer, validator, synthesizer and adapter warning or error with its stable code and source location |
 | Export | WebM (VP9 by default) or MP4 (H.264, offered only if the browser can encode it). 1280×720, 1920×1080 or 1080×1080, at 30 or 60 fps. Rendered frame by frame (no screen capture, no waiting): about 0.5–1 s for a 10 s clip on a desktop. Fallback: real-time MediaRecorder (WebM) when WebCodecs is missing |
 | Download | The validated canonical JSON (diagram + scenario) |
-| Look | Light and dark themes (system), responsive down to phone width, keyboard focus styles, labelled controls |
+| Look (page) | Light and dark page themes (system), responsive down to phone width, keyboard focus styles, labelled controls |
 
 ## Architecture
 

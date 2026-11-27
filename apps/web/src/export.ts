@@ -1,6 +1,8 @@
 import { ArrayBufferTarget as WebmTarget, Muxer as WebmMuxer } from "webm-muxer";
 import { ArrayBufferTarget as Mp4Target, Muxer as Mp4Muxer } from "mp4-muxer";
 import { paintFrame, type BrowserText, type EngineHost } from "@archflow/engine-host";
+import type { CameraPlan } from "@archflow/renderer-adapter";
+import { cameraFrameBounds } from "./framing.ts";
 
 /**
  * Video export on the user's device. Frames are rendered directly from the engine (no screen
@@ -18,6 +20,8 @@ export interface ExportRequest {
   height: number;
   fps: number;
   hiddenMarkers?: ReadonlySet<string>;
+  /** Automatic camera planned for this video's aspect ratio (same plan logic as playback). */
+  camera?: CameraPlan;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
 }
@@ -120,7 +124,12 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
       if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
       if (failure) throw failure;
       const t = Math.min(info.durationMs, (i * 1000) / fps);
-      paintFrame(ctx, engine.frame(t), framing, text);
+      paintFrame(
+        ctx,
+        engine.frame(t),
+        { ...framing, bounds: cameraFrameBounds(info.bounds, req.camera, t) },
+        text,
+      );
       const frame = new VideoFrame(canvas, {
         timestamp: Math.round(i * frameUs),
         duration: Math.round(frameUs),

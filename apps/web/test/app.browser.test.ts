@@ -183,6 +183,74 @@ describe("web app (production build)", () => {
     expect(readFileSync(f).subarray(4, 8).toString("ascii")).toBe("ftyp");
   }, 120_000);
 
+  it("auto camera: on by default, frames differ from the overview, a manual zoom switches it off", async () => {
+    await page.select("#examples", "aws-alb");
+    await page.waitForFunction(
+      () => !(document.querySelector("#animate") as HTMLButtonElement).disabled,
+    );
+    await page.click("#play"); // pause
+    expect(await page.$eval("#auto-camera", (e) => (e as HTMLInputElement).checked)).toBe(true);
+    const shots = async (): Promise<string[]> => {
+      const out: string[] = [];
+      for (let t = 0; t <= 17000; t += 1000) {
+        await page.$eval(
+          "#seek",
+          (e, v) => {
+            (e as HTMLInputElement).value = String(v);
+            e.dispatchEvent(new Event("input", { bubbles: true }));
+          },
+          t,
+        );
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+        out.push(await page.$eval("#canvas", (c) => (c as HTMLCanvasElement).toDataURL()));
+      }
+      return out;
+    };
+    const withCamera = await shots();
+    await page.click("#auto-camera");
+    const without = await shots();
+    expect(withCamera[0]).toBe(without[0]); // starts on the overview
+    expect(withCamera.some((s, i) => s !== without[i])).toBe(true); // zooms somewhere
+    await page.click("#auto-camera");
+    await page.click("#zoom-in");
+    expect(await page.$eval("#auto-camera", (e) => (e as HTMLInputElement).checked)).toBe(false);
+    await page.click("#zoom-fit");
+    await page.click("#auto-camera");
+    expect(problems).toEqual([]);
+  }, 120_000);
+
+  it("themes and dimming restyle the animation and keep the position", async () => {
+    await page.select("#examples", "aws-alb");
+    await page.waitForFunction(
+      () => !(document.querySelector("#animate") as HTMLButtonElement).disabled,
+    );
+    await page.click("#play"); // pause
+    const corner = (): Promise<number[]> =>
+      page.$eval("#canvas", (c) => {
+        const d = (c as HTMLCanvasElement).getContext("2d")!.getImageData(2, 2, 1, 1).data;
+        return [d[0]!, d[1]!, d[2]!];
+      });
+    const time = (): Promise<string> => page.$eval("#time", (e) => e.textContent ?? "");
+    const before = await time();
+    for (const [theme, bg] of [
+      ["light", [0xf6, 0xf8, 0xfc]],
+      ["blueprint", [0x0b, 0x3a, 0x6e]],
+      ["high-contrast", [0, 0, 0]],
+      ["default", [0x0a, 0x11, 0x1f]],
+    ] as const) {
+      await page.select("#theme", theme);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+      expect(await corner(), theme).toEqual([...bg]);
+      expect(await time()).toBe(before);
+    }
+    await page.click("#dim");
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+    expect(await time()).toBe(before);
+    await page.click("#dim");
+    expect(await page.$$eval("#issues li.error", (l) => l.length)).toBe(0);
+    expect(problems).toEqual([]);
+  }, 120_000);
+
   it("zooms and pans large diagrams, and fits again", async () => {
     await page.select("#examples", "aws-alb");
     await page.waitForFunction(
