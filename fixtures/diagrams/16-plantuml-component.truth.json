@@ -1,0 +1,161 @@
+{
+  "id": "16-plantuml-component",
+  "title": "PlantUML component diagram: aliases, element kinds, packages, directional and coloured arrows",
+  "categories": [
+    "plantuml",
+    "nested-groups",
+    "labeled-connectors",
+    "dashed"
+  ],
+  "nodes": [
+    {
+      "key": "cust",
+      "label": "Customer",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "lb",
+      "label": "Load Balancer",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "edge"
+    },
+    {
+      "key": "orders",
+      "label": "Order Service",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "services"
+    },
+    {
+      "key": "pay",
+      "label": "Payment Service",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "services"
+    },
+    {
+      "key": "db",
+      "label": "Orders DB",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "events",
+      "label": "Events",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "stripe",
+      "label": "Stripe",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [
+    {
+      "key": "edge",
+      "label": "Edge",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    {
+      "key": "services",
+      "label": "Services",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "edges": [
+    {
+      "key": "p1",
+      "from": "cust",
+      "to": "lb",
+      "label": "HTTPS",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "p2",
+      "from": "lb",
+      "to": "orders",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "p3",
+      "from": "orders",
+      "to": "events",
+      "label": "OrderPlaced",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "p4",
+      "from": "orders",
+      "to": "db",
+      "label": "SQL",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "p5",
+      "from": "orders",
+      "to": "pay",
+      "label": "charge",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "p6",
+      "from": "pay",
+      "to": "stripe",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "p7",
+      "from": "pay",
+      "to": "events",
+      "label": "consume",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": false,
+    "mermaid": false,
+    "plantuml": "component"
+  },
+  "raw": {
+    "plantuml": "@startuml\ntitle Shop platform\nleft to right direction\nskinparam componentStyle rectangle\nactor Customer as cust\nnode \"Edge\" {\n  [Load Balancer] as lb\n}\npackage \"Services\" {\n  component [Order Service] as orders\n  component \"Payment Service\" as pay\n}\ndatabase \"Orders DB\" as db\nqueue \"Events\" as events\ncloud \"Stripe\" as stripe\ncust --> lb : HTTPS\nlb -right-> orders\norders ..> events : OrderPlaced\norders --> db : SQL\norders -[#red]-> pay : charge\npay --> stripe\nevents <.. pay : consume\n' a comment\nnote right of db : primary\n@enduml\n"
+  }
+}

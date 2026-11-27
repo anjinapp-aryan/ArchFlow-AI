@@ -1,0 +1,18 @@
+@startuml
+title Nested and grouped components
+left to right direction
+component "Internet" as internet
+package "VPC" as vpc {
+  component "Load Balancer" as lb
+  package "Private subnet" as priv {
+    component "App 1" as app1
+    component "App 2" as app2
+    component "Database" as db
+  }
+}
+internet --> lb : 443
+lb --> app1
+lb --> app2
+app1 --> db
+app2 --> db
+@enduml

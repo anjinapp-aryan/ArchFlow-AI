@@ -1,0 +1,76 @@
+{
+  "id": "01-linear",
+  "title": "Simple linear architecture",
+  "categories": [
+    "linear"
+  ],
+  "nodes": [
+    {
+      "key": "client",
+      "label": "Client",
+      "x": 40,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "gw",
+      "label": "API Gateway",
+      "x": 220,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "svc",
+      "label": "Order Service",
+      "x": 400,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "db",
+      "label": "PostgreSQL",
+      "x": 580,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "client",
+      "to": "gw",
+      "label": "HTTPS",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "gw",
+      "to": "svc",
+      "label": "REST",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "svc",
+      "to": "db",
+      "label": "SQL",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

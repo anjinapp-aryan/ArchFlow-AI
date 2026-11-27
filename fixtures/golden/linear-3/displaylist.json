@@ -1,0 +1,42 @@
+{
+  "schema": "archflow/golden-displaylist@1",
+  "metrics": "deterministic-v1",
+  "fixture": "linear-3",
+  "frames": {
+    "0": {
+      "sha256": "34942ca6585bca484f972735e757665e7bc40ea778ba087efc7797ac096b8c33",
+      "doubles": 591,
+      "stringBytes": 46
+    },
+    "500": {
+      "sha256": "48c02f456e83b48e2cc49f5c4166ce2023deb48e2feddd1da6cb1b46cdf41cd6",
+      "doubles": 676,
+      "stringBytes": 49
+    },
+    "1000": {
+      "sha256": "908156d91de2c36eef51c664f24a545052f529f19914361d828b468351db55e6",
+      "doubles": 676,
+      "stringBytes": 49
+    },
+    "1500": {
+      "sha256": "4b5e4670d0a16825c9c3055b34982b25c19f09659a4b250149e447cbb711611b",
+      "doubles": 676,
+      "stringBytes": 52
+    },
+    "2600": {
+      "sha256": "1f835b148d1a78c1cdd9126e740e17d11d6f90090e635275c10c1a89163e3e19",
+      "doubles": 676,
+      "stringBytes": 50
+    },
+    "3800": {
+      "sha256": "f7c50214f0919f980e199698cb0cd2348d65c7ca44c95938dc3e7171a7096e2a",
+      "doubles": 676,
+      "stringBytes": 49
+    },
+    "5000": {
+      "sha256": "34942ca6585bca484f972735e757665e7bc40ea778ba087efc7797ac096b8c33",
+      "doubles": 591,
+      "stringBytes": 46
+    }
+  }
+}

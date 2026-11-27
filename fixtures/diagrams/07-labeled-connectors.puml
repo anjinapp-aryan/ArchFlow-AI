@@ -1,0 +1,12 @@
+@startuml
+title Labeled connectors with special characters
+left to right direction
+component "Cart & Checkout" as a
+component "Pricing" as b
+component "Café Service" as c
+component "Ledger" as d
+a --> b : GET /prices/{sku}
+a --> c : ok (200)
+c --> d : débit → crédit
+b --> d : a & b: 50%
+@enduml

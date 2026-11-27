@@ -1,0 +1,36 @@
+{
+  "$comment": "Single source of truth for the pinned engine build. Edit deliberately; CI verifies.",
+  "upstream": {
+    "name": "AnimatedDiagrams",
+    "repo": "https://github.com/codeRATny/AnimatedDiagrams.git",
+    "tag": "v2.2.0",
+    "revision": "3ce17fc3be7cacdb6b65dce362c86674043a4baa",
+    "license": "MIT"
+  },
+  "toolchain": {
+    "emsdk": {
+      "repo": "https://github.com/emscripten-core/emsdk.git",
+      "revision": "a7c808831a666cc903fedb906c171a718cd97341",
+      "emscripten": "7.0.1"
+    },
+    "python": { "cmake": "4.4.5", "ninja": "1.13.2" }
+  },
+  "upstreamPinnedDependencies": {
+    "nlohmann_json": {
+      "version": "3.11.3",
+      "sha256": "d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d",
+      "license": "MIT",
+      "note": "downloaded by upstream cmake/Dependencies.cmake with URL_HASH"
+    },
+    "nanosvg": {
+      "commit": "93ce879dc4c04a3ef1758428ec80083c38610b1f",
+      "sha256": "b0057538cd65b6d8a37a2ef7f5aa3905a14f82964b741534ca61bf20054dcc31",
+      "license": "Zlib",
+      "note": "header nanosvg.h downloaded by upstream cmake/Dependencies.cmake with URL_HASH"
+    }
+  },
+  "artifacts": {
+    "engineJs": "player/ad_player_engine.js",
+    "playerTemplate": "player/player.html"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "archflow/golden-displaylist@1",
+  "metrics": "deterministic-v1",
+  "fixture": "order-flow",
+  "frames": {
+    "0": {
+      "sha256": "f78363c9e1a649b515688b4b2ddbf320b2164608e065fb98abe5f5884eef5d77",
+      "doubles": 1626,
+      "stringBytes": 202
+    },
+    "700": {
+      "sha256": "5e9f2a91a6ac38738957c956fb4a7170e2346d7303756a6eecf4cab56e1cc828",
+      "doubles": 1711,
+      "stringBytes": 214
+    },
+    "1700": {
+      "sha256": "cc955b766ad693a88298e9acffe062e1455181dd9ea1a0b6f2f94abb548ac19c",
+      "doubles": 1711,
+      "stringBytes": 210
+    },
+    "2500": {
+      "sha256": "a4450f963c0d103dccc776aabeed1adcbf2f82d9a7ed51f8af866629a46ba742",
+      "doubles": 1711,
+      "stringBytes": 204
+    },
+    "3400": {
+      "sha256": "705e53d4fe9efb801362d910d4aad0c4e2c93d1f92ddbe1668b5aea756feb191",
+      "doubles": 1711,
+      "stringBytes": 208
+    },
+    "4400": {
+      "sha256": "68c8297a836ca44dfb62a9afb1599d95db8a60e95fb1df6eab1d4359df48b07b",
+      "doubles": 1713,
+      "stringBytes": 214
+    },
+    "5400": {
+      "sha256": "48ff275a9d9bc6965617deb512cc39fb085f660282ed0498c37e3f4280fd4edf",
+      "doubles": 1800,
+      "stringBytes": 214
+    },
+    "6500": {
+      "sha256": "3efc3ad08f253569b97d2292028c12f699fff86c23d6d2b6ef3f372c422567a5",
+      "doubles": 1798,
+      "stringBytes": 213
+    },
+    "7900": {
+      "sha256": "f99b37ec4c8fa7f0eaf7edb3435a8694afb3115eedd674735672cae977f28f91",
+      "doubles": 1713,
+      "stringBytes": 205
+    },
+    "8800": {
+      "sha256": "12baf44f89e4a01d0e48ae11cb083fc85f705d60f0cee2a2b2eac9aeda63d23a",
+      "doubles": 1711,
+      "stringBytes": 206
+    },
+    "9900": {
+      "sha256": "73374d226874443626a7f746b99267053416fb3ec3cc67017aa77e8880b063f3",
+      "doubles": 1711,
+      "stringBytes": 206
+    },
+    "10900": {
+      "sha256": "37ee62d0053388a4316aed147d118d39a568dbd3d1ff789e366706d8b1dbe177",
+      "doubles": 1711,
+      "stringBytes": 213
+    },
+    "12000": {
+      "sha256": "62a201d1f77880b34d474bd1b098dd00a42324bdcf3c6d7cfd88a644d049a59a",
+      "doubles": 1626,
+      "stringBytes": 203
+    },
+    "16000": {
+      "sha256": "f78363c9e1a649b515688b4b2ddbf320b2164608e065fb98abe5f5884eef5d77",
+      "doubles": 1626,
+      "stringBytes": 202
+    }
+  }
+}

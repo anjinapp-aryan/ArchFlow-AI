@@ -1,0 +1,18 @@
+flowchart LR
+  user(["User<br/>Human actor"])
+  gateway["API Gateway<br/>REST / GraphQL"]
+  authentication{{"Authentication Service<br/>OAuth / OIDC"}}
+  order(["Order Service<br/>Container"])
+  kafka["Kafka<br/>Event topic"]
+  consumer(["Consumer"])
+  postgre[("PostgreSQL<br/>postgres")]
+  user -->|"https request"| gateway
+  gateway ==>|"validate token"| authentication
+  authentication -->|"authorized"| order
+  order -.->|"publish ordercreated"| kafka
+  kafka -->|"consume"| consumer
+  consumer -->|"write order"| postgre
+  postgre -->|"ack"| consumer
+  consumer -->|"result"| order
+  order -->|"response"| gateway
+  gateway -->|"201 created"| user

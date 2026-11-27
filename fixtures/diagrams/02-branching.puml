@@ -1,0 +1,14 @@
+@startuml
+title Branching architecture
+left to right direction
+component "Gateway" as gw
+component "Orders" as orders
+component "Users" as users
+component "Billing" as billing
+component "Shared DB" as db
+gw --> orders
+gw --> users
+gw --> billing
+orders --> db
+billing --> db
+@enduml

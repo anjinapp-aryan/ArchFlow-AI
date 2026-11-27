@@ -1,0 +1,86 @@
+{
+  "id": "08-dashed-curved",
+  "title": "Dashed, dotted-style and curved connectors",
+  "categories": [
+    "dashed",
+    "curved"
+  ],
+  "nodes": [
+    {
+      "key": "a",
+      "label": "Source",
+      "x": 40,
+      "y": 60,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "b",
+      "label": "Worker",
+      "x": 300,
+      "y": 60,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c",
+      "label": "Queue",
+      "x": 300,
+      "y": 220,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "d",
+      "label": "Sink",
+      "x": 40,
+      "y": 220,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "a",
+      "to": "b",
+      "label": "sync",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "b",
+      "to": "c",
+      "label": "async",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "curved"
+    },
+    {
+      "key": "e3",
+      "from": "c",
+      "to": "d",
+      "label": "drain",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "orthogonal"
+    },
+    {
+      "key": "e4",
+      "from": "a",
+      "to": "d",
+      "label": "audit",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "curved"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

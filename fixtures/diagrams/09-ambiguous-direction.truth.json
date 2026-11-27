@@ -1,0 +1,79 @@
+{
+  "id": "09-ambiguous-direction",
+  "title": "Missing or ambiguous arrow directions",
+  "categories": [
+    "ambiguous-direction"
+  ],
+  "nodes": [
+    {
+      "key": "a",
+      "label": "Alpha",
+      "x": 40,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "b",
+      "label": "Beta",
+      "x": 260,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c",
+      "label": "Gamma",
+      "x": 480,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "d",
+      "label": "Delta",
+      "x": 260,
+      "y": 240,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "a",
+      "to": "b",
+      "label": "plain line",
+      "direction": "none",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "b",
+      "to": "c",
+      "label": "arrow at source",
+      "direction": "backward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "b",
+      "to": "d",
+      "label": "normal",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 1,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  },
+  "mermaidExclude": [
+    "e2"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@archflow/renderer-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@archflow/canonical-model": "0.1.0"
+  }
+}

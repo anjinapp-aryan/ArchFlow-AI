@@ -1,0 +1,156 @@
+{
+  "id": "10-order-flow",
+  "title": "Order-flow benchmark architecture",
+  "categories": [
+    "linear",
+    "branching",
+    "parallel",
+    "labeled-connectors"
+  ],
+  "nodes": [
+    {
+      "key": "user",
+      "label": "User",
+      "x": 20,
+      "y": 170,
+      "w": 110,
+      "h": 60
+    },
+    {
+      "key": "gw",
+      "label": "API Gateway",
+      "x": 180,
+      "y": 170,
+      "w": 130,
+      "h": 60
+    },
+    {
+      "key": "auth",
+      "label": "Authentication Service",
+      "x": 180,
+      "y": 40,
+      "w": 160,
+      "h": 60
+    },
+    {
+      "key": "order",
+      "label": "Order Service",
+      "x": 380,
+      "y": 170,
+      "w": 130,
+      "h": 60
+    },
+    {
+      "key": "kafka",
+      "label": "Kafka",
+      "x": 560,
+      "y": 170,
+      "w": 110,
+      "h": 60
+    },
+    {
+      "key": "c1",
+      "label": "Consumer 1",
+      "x": 720,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c2",
+      "label": "Consumer 2",
+      "x": 720,
+      "y": 250,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "pg",
+      "label": "PostgreSQL",
+      "x": 900,
+      "y": 170,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "user",
+      "to": "gw",
+      "label": "HTTPS",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "gw",
+      "to": "auth",
+      "label": "validate",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "gw",
+      "to": "order",
+      "label": "REST",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e4",
+      "from": "order",
+      "to": "kafka",
+      "label": "produce",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e5",
+      "from": "kafka",
+      "to": "c1",
+      "label": "consume",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e6",
+      "from": "kafka",
+      "to": "c2",
+      "label": "consume",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e7",
+      "from": "c1",
+      "to": "pg",
+      "label": "write",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e8",
+      "from": "c2",
+      "to": "pg",
+      "label": "write",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

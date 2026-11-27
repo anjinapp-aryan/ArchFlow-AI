@@ -1,0 +1,9 @@
+flowchart LR
+    a["Cart & Checkout"]
+    b["Pricing"]
+    c["Café Service"]
+    d["Ledger"]
+    a -->|"GET /prices/{sku}"| b
+    a -->|"ok (200)"| c
+    c -->|"débit → crédit"| d
+    b -->|"a & b: 50%"| d

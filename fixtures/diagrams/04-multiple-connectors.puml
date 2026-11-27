@@ -1,0 +1,11 @@
+@startuml
+title Multiple connectors between the same components
+left to right direction
+component "Web App" as web
+component "API" as api
+component "Cache" as cache
+web --> api : REST
+web ..> api : gRPC
+api ..> web : callback
+api --> cache : get
+@enduml

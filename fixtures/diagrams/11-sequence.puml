@@ -1,0 +1,10 @@
+@startuml
+title Sequence diagram (request/response)
+participant "User" as u
+participant "Gateway" as g
+participant "Orders" as o
+u -> g : POST /orders
+g -> o : create
+o --> g : 201
+g --> u : 201 Created
+@enduml

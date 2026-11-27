@@ -1,0 +1,22 @@
+@startuml
+title Checkout
+actor User as U
+participant "Web App" as W
+box "Backend"
+  participant "Orders API" as API
+  database "Orders DB" as DB
+end box
+U -> W : open checkout
+W -> API : POST /orders
+activate API
+API -> DB : INSERT
+DB --> API : ok
+API ->x DB : audit
+alt success
+  API --> W : 201
+else failure
+  API --> W : 500
+end
+W --> U : confirmation
+deactivate API
+@enduml

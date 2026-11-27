@@ -1,0 +1,11 @@
+@startuml
+title Simple linear architecture
+left to right direction
+component "Client" as client
+component "API Gateway" as gw
+component "Order Service" as svc
+component "PostgreSQL" as db
+client --> gw : HTTPS
+gw --> svc : REST
+svc --> db : SQL
+@enduml

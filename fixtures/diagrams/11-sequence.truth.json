@@ -1,0 +1,78 @@
+{
+  "id": "11-sequence",
+  "title": "Sequence diagram (request/response)",
+  "categories": [
+    "request-response",
+    "sequence"
+  ],
+  "nodes": [
+    {
+      "key": "u",
+      "label": "User",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "g",
+      "label": "Gateway",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "o",
+      "label": "Orders",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "m1",
+      "from": "u",
+      "to": "g",
+      "label": "POST /orders",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m2",
+      "from": "g",
+      "to": "o",
+      "label": "create",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m3",
+      "from": "o",
+      "to": "g",
+      "label": "201",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "m4",
+      "from": "g",
+      "to": "u",
+      "label": "201 Created",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": false,
+    "mermaid": "sequence"
+  }
+}

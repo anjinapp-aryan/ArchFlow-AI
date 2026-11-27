@@ -1,0 +1,17 @@
+{
+  "name": "@archflow/engine-host",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@archflow/qa": "0.1.0",
+    "@archflow/renderer-adapter": "0.1.0"
+  }
+}

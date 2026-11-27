@@ -1,0 +1,103 @@
+{
+  "id": "03-parallel-consumers",
+  "title": "Parallel consumers",
+  "categories": [
+    "parallel",
+    "branching"
+  ],
+  "nodes": [
+    {
+      "key": "order",
+      "label": "Order Service",
+      "x": 40,
+      "y": 140,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "kafka",
+      "label": "Kafka",
+      "x": 220,
+      "y": 140,
+      "w": 100,
+      "h": 60
+    },
+    {
+      "key": "c1",
+      "label": "Consumer 1",
+      "x": 420,
+      "y": 60,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c2",
+      "label": "Consumer 2",
+      "x": 420,
+      "y": 220,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "pg",
+      "label": "PostgreSQL",
+      "x": 620,
+      "y": 140,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "order",
+      "to": "kafka",
+      "label": "produce",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "kafka",
+      "to": "c1",
+      "label": "consume",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "kafka",
+      "to": "c2",
+      "label": "consume",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e4",
+      "from": "c1",
+      "to": "pg",
+      "label": "write",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e5",
+      "from": "c2",
+      "to": "pg",
+      "label": "write",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

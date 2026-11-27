@@ -1,0 +1,102 @@
+{
+  "id": "13-drawio-realworld",
+  "title": "draw.io export patterns: wrappers, HTML labels, layers, selection groups, edge-label cells",
+  "categories": [
+    "real-world-drawio",
+    "nested-groups",
+    "labeled-connectors",
+    "dashed",
+    "ambiguous-direction"
+  ],
+  "nodes": [
+    {
+      "key": "web",
+      "label": "Web Client",
+      "x": 40,
+      "y": 80,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "api",
+      "label": "API",
+      "x": 250,
+      "y": 80,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "db",
+      "label": "Orders DB",
+      "x": 460,
+      "y": 70,
+      "w": 80,
+      "h": 80
+    },
+    {
+      "key": "worker",
+      "label": "Worker",
+      "x": 440,
+      "y": 290,
+      "w": 120,
+      "h": 60,
+      "group": "vpc"
+    }
+  ],
+  "groups": [
+    {
+      "key": "vpc",
+      "label": "Cloud VPC",
+      "x": 420,
+      "y": 240,
+      "w": 240,
+      "h": 140
+    }
+  ],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "web",
+      "to": "api",
+      "label": "HTTPS",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "api",
+      "to": "db",
+      "label": "SQL",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "orthogonal"
+    },
+    {
+      "key": "e3",
+      "from": "api",
+      "to": "worker",
+      "label": "jobs",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "e5",
+      "from": "worker",
+      "to": "db",
+      "label": "replicate",
+      "direction": "none",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": false
+  },
+  "raw": {
+    "drawio": "<mxfile host=\"Electron\" agent=\"handwritten-corpus\" version=\"24.7.17\" type=\"device\">\n  <diagram id=\"arch-page\" name=\"Architecture\">\n    <mxGraphModel dx=\"1422\" dy=\"794\" grid=\"1\" gridSize=\"10\" guides=\"1\" tooltips=\"1\" connect=\"1\" arrows=\"1\" fold=\"1\" page=\"1\" pageScale=\"1\" pageWidth=\"1169\" pageHeight=\"827\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\" />\n        <mxCell id=\"1\" parent=\"0\" />\n        <mxCell id=\"layer-data\" value=\"Data layer\" parent=\"0\" />\n        <UserObject label=\"&lt;b&gt;Web&lt;/b&gt;&lt;br&gt;Client\" tooltip=\"browser app\" id=\"web 1\">\n          <mxCell style=\"rounded=1;whiteSpace=wrap;html=1;\" vertex=\"1\" parent=\"1\">\n            <mxGeometry x=\"40\" y=\"80\" width=\"120\" height=\"60\" as=\"geometry\" />\n          </mxCell>\n        </UserObject>\n        <mxCell id=\"grpA\" value=\"\" style=\"group\" vertex=\"1\" connectable=\"0\" parent=\"1\">\n          <mxGeometry x=\"240\" y=\"40\" width=\"140\" height=\"160\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"api\" value=\"API\" style=\"rounded=0;whiteSpace=wrap;html=1;\" vertex=\"1\" parent=\"grpA\">\n          <mxGeometry x=\"10\" y=\"40\" width=\"120\" height=\"60\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"note1\" value=\"handles auth &amp;amp; rate limits\" style=\"text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;\" vertex=\"1\" parent=\"1\">\n          <mxGeometry x=\"240\" y=\"220\" width=\"140\" height=\"30\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"db\" value=\"Orders DB\" style=\"shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;\" vertex=\"1\" parent=\"layer-data\">\n          <mxGeometry x=\"460\" y=\"70\" width=\"80\" height=\"80\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"vpc\" value=\"Cloud VPC\" style=\"points=[];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;container=1;collapsible=0;html=1;\" vertex=\"1\" parent=\"1\">\n          <mxGeometry x=\"420\" y=\"240\" width=\"240\" height=\"140\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"w-1\" value=\"Worker\" style=\"rounded=1;whiteSpace=wrap;html=1;\" vertex=\"1\" parent=\"vpc\">\n          <mxGeometry x=\"20\" y=\"50\" width=\"120\" height=\"60\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"e1\" style=\"edgeStyle=none;rounded=0;html=1;\" edge=\"1\" parent=\"1\" source=\"web 1\" target=\"api\">\n          <mxGeometry relative=\"1\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"lbl1\" value=\"HTTPS\" style=\"edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];\" vertex=\"1\" connectable=\"0\" parent=\"e1\">\n          <mxGeometry x=\"-0.1\" relative=\"1\" as=\"geometry\">\n            <mxPoint as=\"offset\" />\n          </mxGeometry>\n        </mxCell>\n        <mxCell id=\"e2\" value=\"SQL\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;\" edge=\"1\" parent=\"1\" source=\"api\" target=\"db\">\n          <mxGeometry relative=\"1\" as=\"geometry\">\n            <Array as=\"points\">\n              <mxPoint x=\"420\" y=\"110\" />\n            </Array>\n          </mxGeometry>\n        </mxCell>\n        <mxCell id=\"e3\" value=\"jobs\" style=\"dashed=1;endArrow=open;endFill=0;html=1;\" edge=\"1\" parent=\"1\" source=\"api\" target=\"w-1\">\n          <mxGeometry relative=\"1\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"e4\" value=\"deploys\" style=\"html=1;\" edge=\"1\" parent=\"1\" source=\"web 1\" target=\"vpc\">\n          <mxGeometry relative=\"1\" as=\"geometry\" />\n        </mxCell>\n        <mxCell id=\"e5\" value=\"replicate\" style=\"endArrow=none;startArrow=none;html=1;\" edge=\"1\" parent=\"1\" source=\"w-1\" target=\"db\">\n          <mxGeometry relative=\"1\" as=\"geometry\" />\n        </mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n"
+  }
+}

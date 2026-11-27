@@ -1,0 +1,77 @@
+{
+  "schema": "archflow/golden-pixels@1",
+  "fixture": "order-flow",
+  "environment": "win32-x64-chrome158",
+  "frames": {
+    "0": {
+      "sha256": "e91d0695d3a53d8d2251c3a3c932be4836311d689ce26a3ae7c5e95e7164e484",
+      "width": 1280,
+      "height": 560
+    },
+    "700": {
+      "sha256": "182dfd108af732e79fd42a4aac347a50175134381d2463cb2aa0b22046e104e1",
+      "width": 1280,
+      "height": 560
+    },
+    "1700": {
+      "sha256": "3a70ee0741b9a48bd83726be00c64ebb036ab2f2bdf92b2f313c2cb28789a768",
+      "width": 1280,
+      "height": 560
+    },
+    "2500": {
+      "sha256": "2c5a298b2e2d9136aa70eb7e7d45d9716284416cad3a752aa3707e87e90dd7e3",
+      "width": 1280,
+      "height": 560
+    },
+    "3400": {
+      "sha256": "01a380dfb03329b9721e6489921ea46c50d3df17d56a7fd3f5deed10c638a6e2",
+      "width": 1280,
+      "height": 560
+    },
+    "4400": {
+      "sha256": "428ba61867df93f1d485a5cf21f538819c02518b70e996863fb4e0b4b32d689a",
+      "width": 1280,
+      "height": 560
+    },
+    "5400": {
+      "sha256": "286f7b67f7898f1d21771e4fa6c73570bde01b03a87b6669f0e5ccf1d967c0f4",
+      "width": 1280,
+      "height": 560
+    },
+    "6500": {
+      "sha256": "e75ffe651b382c8e06cb95e6c4ca22a20247b0db63431764980070d74d4aefa1",
+      "width": 1280,
+      "height": 560
+    },
+    "7900": {
+      "sha256": "b33dc9ef94371b93292407dbc49d373e62060f996b22e30a1a9eb23a37b74805",
+      "width": 1280,
+      "height": 560
+    },
+    "8800": {
+      "sha256": "b2f315f5c8d3fa89546e212d4fb394c6ede9035191f55448a195aa5f8cf46d66",
+      "width": 1280,
+      "height": 560
+    },
+    "9900": {
+      "sha256": "5fa73b31b6ee89c2b9586276e18daa8b81f9aed6844929b7ec656a042162192a",
+      "width": 1280,
+      "height": 560
+    },
+    "10900": {
+      "sha256": "9bd1c9cb6233865aa6f908a44efdade8a709beed13132f45a194310a57b41d13",
+      "width": 1280,
+      "height": 560
+    },
+    "12000": {
+      "sha256": "2c366bc1ab4583909a43ad58466262eb6715b4ee8321902502a3ac9312f40e9d",
+      "width": 1280,
+      "height": 560
+    },
+    "16000": {
+      "sha256": "e91d0695d3a53d8d2251c3a3c932be4836311d689ce26a3ae7c5e95e7164e484",
+      "width": 1280,
+      "height": 560
+    }
+  }
+}

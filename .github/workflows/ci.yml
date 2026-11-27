@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, unit tests, licences (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run licenses:check
+      - name: Importer corpus files match their generator
+        run: node scripts/make-corpus.mjs --check
+
+  engine:
+    name: Engine WASM build + golden frames (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: emsdk-${{ runner.os }}-${{ hashFiles('engine/upstream.lock.json') }}
+      - name: Build engine (pinned upstream revision -> WASM)
+        run: npm run engine:build
+      - name: Verify artifact hashes
+        # Fails on mismatch for a recorded platform; warns loudly for an unrecorded one (see manifest artifact).
+        run: npm run engine:verify
+      - name: Collect licence texts and check they are committed
+        shell: bash
+        run: |
+          npm run licenses:collect
+          git diff --exit-code -- licenses/MANIFEST.json licenses/ENGINE_LINK_INPUTS.txt
+      - run: npm run build
+      - name: Browser tests (goldens, painter parity, importers, benchmark, web app end to end)
+        run: npm run test:browser
+      - name: Production web build
+        run: npm run web:build
+      - name: Upload the deployable site
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: archflow-web-dist
+          path: apps/web/dist/
+      - name: Upload build manifest and golden candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ runner.os }}
+          if-no-files-found: ignore
+          path: |
+            build/engine/manifest.json
+            build/engine/link-inputs.txt
+            artifacts/golden-candidates/

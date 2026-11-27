@@ -1,0 +1,279 @@
+{
+  "air_version": 1,
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User",
+      "subtitle": "Human actor",
+      "component_type": "user",
+      "category": "application",
+      "icon": "User",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "gateway",
+      "label": "API Gateway",
+      "subtitle": "REST / GraphQL",
+      "component_type": "api",
+      "category": "integration",
+      "icon": "Globe",
+      "position": {
+        "x": 300,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "authentication",
+      "label": "Authentication Service",
+      "subtitle": "OAuth / OIDC",
+      "component_type": "iam",
+      "category": "security",
+      "icon": "KeyRound",
+      "position": {
+        "x": 600,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "order",
+      "label": "Order Service",
+      "subtitle": "Container",
+      "component_type": "service",
+      "category": "application",
+      "icon": "Server",
+      "position": {
+        "x": 900,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "kafka",
+      "label": "Kafka",
+      "subtitle": "Event topic",
+      "component_type": "kafka",
+      "category": "integration",
+      "icon": "brand:kafka",
+      "position": {
+        "x": 1200,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "consumer",
+      "label": "Consumer",
+      "component_type": "generic",
+      "category": "application",
+      "icon": "Server",
+      "position": {
+        "x": 1500,
+        "y": 0
+      },
+      "group_id": null
+    },
+    {
+      "id": "postgre",
+      "label": "PostgreSQL",
+      "subtitle": "postgres",
+      "component_type": "postgres",
+      "category": "data",
+      "icon": "brand:postgres",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "group_id": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source_node_id": "user",
+      "target_node_id": "gateway",
+      "direction": "forward",
+      "semantic_type": "request",
+      "protocol": "REST",
+      "execution_mode": "synchronous",
+      "label": "https request"
+    },
+    {
+      "id": "e2",
+      "source_node_id": "gateway",
+      "target_node_id": "authentication",
+      "direction": "forward",
+      "semantic_type": "stream",
+      "protocol": "SSE",
+      "execution_mode": "streaming",
+      "label": "validate token"
+    },
+    {
+      "id": "e3",
+      "source_node_id": "authentication",
+      "target_node_id": "order",
+      "direction": "forward",
+      "semantic_type": "control",
+      "protocol": "gRPC",
+      "execution_mode": "synchronous",
+      "label": "authorized"
+    },
+    {
+      "id": "e4",
+      "source_node_id": "order",
+      "target_node_id": "kafka",
+      "direction": "forward",
+      "semantic_type": "event",
+      "protocol": "Kafka",
+      "execution_mode": "asynchronous",
+      "label": "publish ordercreated"
+    },
+    {
+      "id": "e5",
+      "source_node_id": "kafka",
+      "target_node_id": "consumer",
+      "direction": "forward",
+      "semantic_type": "request",
+      "protocol": "Kafka",
+      "execution_mode": "synchronous",
+      "label": "consume"
+    },
+    {
+      "id": "e6",
+      "source_node_id": "consumer",
+      "target_node_id": "postgre",
+      "direction": "forward",
+      "semantic_type": "data",
+      "protocol": "SQL",
+      "execution_mode": "synchronous",
+      "label": "write order"
+    },
+    {
+      "id": "e7",
+      "source_node_id": "postgre",
+      "target_node_id": "consumer",
+      "direction": "forward",
+      "semantic_type": "request",
+      "protocol": "REST",
+      "execution_mode": "synchronous",
+      "label": "ack"
+    },
+    {
+      "id": "e8",
+      "source_node_id": "consumer",
+      "target_node_id": "order",
+      "direction": "forward",
+      "semantic_type": "response",
+      "protocol": "REST",
+      "execution_mode": "synchronous",
+      "label": "result"
+    },
+    {
+      "id": "e9",
+      "source_node_id": "order",
+      "target_node_id": "gateway",
+      "direction": "forward",
+      "semantic_type": "response",
+      "protocol": "REST",
+      "execution_mode": "synchronous",
+      "label": "response"
+    },
+    {
+      "id": "e10",
+      "source_node_id": "gateway",
+      "target_node_id": "user",
+      "direction": "forward",
+      "semantic_type": "request",
+      "protocol": "REST",
+      "execution_mode": "synchronous",
+      "label": "201 created"
+    }
+  ],
+  "motion": [
+    {
+      "edge_id": "e1",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e2",
+      "grammar": "dense",
+      "enabled": true,
+      "density": 16,
+      "speed": 1.1,
+      "size": 2
+    },
+    {
+      "edge_id": "e3",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e4",
+      "grammar": "pulse",
+      "enabled": true,
+      "density": 1,
+      "speed": 1.2,
+      "size": 5.5
+    },
+    {
+      "edge_id": "e5",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e6",
+      "grammar": "stream",
+      "enabled": true,
+      "density": 9,
+      "speed": 1.6,
+      "size": 2.6
+    },
+    {
+      "edge_id": "e7",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e8",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e9",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    },
+    {
+      "edge_id": "e10",
+      "grammar": "packet",
+      "enabled": true,
+      "density": 3,
+      "speed": 2.4,
+      "size": 4
+    }
+  ]
+}

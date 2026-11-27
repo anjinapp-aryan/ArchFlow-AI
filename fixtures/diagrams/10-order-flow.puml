@@ -1,0 +1,20 @@
+@startuml
+title Order-flow benchmark architecture
+left to right direction
+component "User" as user
+component "API Gateway" as gw
+component "Authentication Service" as auth
+component "Order Service" as order
+component "Kafka" as kafka
+component "Consumer 1" as c1
+component "Consumer 2" as c2
+component "PostgreSQL" as pg
+user --> gw : HTTPS
+gw --> auth : validate
+gw --> order : REST
+order --> kafka : produce
+kafka --> c1 : consume
+kafka --> c2 : consume
+c1 --> pg : write
+c2 --> pg : write
+@enduml

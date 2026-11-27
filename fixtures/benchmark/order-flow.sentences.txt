@@ -1,0 +1,7 @@
+The User sends POST /orders to the API Gateway.
+The API Gateway validates the token with the Authentication Service.
+The API Gateway forwards the order to the Order Service.
+The Order Service publishes OrderCreated to Kafka.
+Consumer 1 consumes from Kafka. Consumer 2 consumes from Kafka.
+Consumer 1 writes the order to PostgreSQL.
+Consumer 1 times out writing to PostgreSQL and retries once.

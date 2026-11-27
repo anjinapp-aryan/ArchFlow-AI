@@ -1,0 +1,9 @@
+{
+  "name": "archflow-raster-spike",
+  "private": true,
+  "type": "module",
+  "description": "P1.7 raster import feasibility spike (research only, never shipped)",
+  "dependencies": {
+    "tesseract.js": "7.0.0"
+  }
+}

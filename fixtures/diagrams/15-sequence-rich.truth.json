@@ -1,0 +1,138 @@
+{
+  "id": "15-sequence-rich",
+  "title": "Mermaid sequence: actors, aliases, box, activations, failed and async messages, par, loop, note",
+  "categories": [
+    "sequence",
+    "request-response",
+    "parallel",
+    "nested-groups"
+  ],
+  "nodes": [
+    {
+      "key": "C",
+      "label": "Customer",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "API",
+      "label": "Order API",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "box"
+    },
+    {
+      "key": "PAY",
+      "label": "Payments",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "box"
+    },
+    {
+      "key": "Q",
+      "label": "Event bus",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [
+    {
+      "key": "box",
+      "label": "Backend services",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "edges": [
+    {
+      "key": "m1",
+      "from": "C",
+      "to": "API",
+      "label": "POST /orders",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m2",
+      "from": "API",
+      "to": "PAY",
+      "label": "charge",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m3",
+      "from": "PAY",
+      "to": "API",
+      "label": "declined",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m4",
+      "from": "API",
+      "to": "PAY",
+      "label": "charge (retry)",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m5",
+      "from": "PAY",
+      "to": "API",
+      "label": "ok",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "m6",
+      "from": "API",
+      "to": "Q",
+      "label": "OrderPlaced",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "m7",
+      "from": "API",
+      "to": "C",
+      "label": "201 Created",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "m8",
+      "from": "C",
+      "to": "API",
+      "label": "GET /orders/1",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": false,
+    "mermaid": "sequence"
+  },
+  "raw": {
+    "mermaid": "sequenceDiagram\n    autonumber\n    title Checkout\n    actor C as Customer\n    box Backend services\n      participant API as Order API\n      participant PAY as Payments\n    end\n    participant Q as Event bus\n    C->>+API: POST /orders\n    API->>PAY: charge\n    PAY-xAPI: declined\n    API->>PAY: charge (retry)\n    PAY-->>API: ok\n    Note over API,PAY: payment settled\n    par notify\n      API-)Q: OrderPlaced\n    and respond\n      API-->>-C: 201 Created\n    end\n    loop every 5s\n      C->>API: GET /orders/1\n    end\n"
+  }
+}

@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant u as User
+    participant g as Gateway
+    participant o as Orders
+    u->>g: POST /orders
+    g->>o: create
+    o-->>g: 201
+    g-->>u: 201 Created

@@ -1,0 +1,47 @@
+{
+  "name": "archflow-ai",
+  "version": "0.2.0",
+  "private": true,
+  "license": "MIT",
+  "description": "ArchFlow AI: animate how requests and data travel through an existing architecture diagram (Phase 1.1 foundation)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "engine:build": "node scripts/build-engine.mjs",
+    "engine:verify": "node scripts/build-engine.mjs --verify-only",
+    "build": "npm run build -w @archflow/engine-host",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "golden:update": "node scripts/golden-update.mjs",
+    "licenses:check": "node scripts/check-licenses.mjs",
+    "licenses:collect": "node scripts/collect-licenses.mjs",
+    "ci": "npm run typecheck && npm run lint && npm run test && npm run licenses:check",
+    "corpus:generate": "node scripts/make-corpus.mjs",
+    "importers:report": "node scripts/importers-report.mjs",
+    "demos": "node scripts/make-demos.mjs",
+    "web:build": "node apps/web/build.mjs",
+    "web:serve": "node scripts/serve-web.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.10",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "license-checker-rseidelsohn": "5.0.1",
+    "prettier": "3.10.1",
+    "puppeteer-core": "25.18.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0",
+    "vitest": "5.1.2"
+  }
+}

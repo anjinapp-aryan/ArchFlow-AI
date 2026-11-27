@@ -1,0 +1,9 @@
+flowchart LR
+    a["Source"]
+    b["Worker"]
+    c["Queue"]
+    d["Sink"]
+    a -->|"sync"| b
+    b -.->|"async"| c
+    c -.->|"drain"| d
+    a -->|"audit"| d

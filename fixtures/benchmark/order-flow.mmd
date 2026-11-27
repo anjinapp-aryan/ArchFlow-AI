@@ -1,0 +1,8 @@
+flowchart LR
+  U[User] -->|POST /orders| GW[API Gateway]
+  GW -->|validate| AUTH[Authentication Service]
+  GW -->|create order| ORD[Order Service]
+  ORD -.->|OrderCreated| K[Kafka]
+  K -.->|consume| C1[Consumer 1]
+  K -.->|consume| C2[Consumer 2]
+  C1 -->|INSERT| PG[(PostgreSQL)]

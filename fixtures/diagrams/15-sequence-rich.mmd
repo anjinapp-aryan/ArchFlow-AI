@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    title Checkout
+    actor C as Customer
+    box Backend services
+      participant API as Order API
+      participant PAY as Payments
+    end
+    participant Q as Event bus
+    C->>+API: POST /orders
+    API->>PAY: charge
+    PAY-xAPI: declined
+    API->>PAY: charge (retry)
+    PAY-->>API: ok
+    Note over API,PAY: payment settled
+    par notify
+      API-)Q: OrderPlaced
+    and respond
+      API-->>-C: 201 Created
+    end
+    loop every 5s
+      C->>API: GET /orders/1
+    end

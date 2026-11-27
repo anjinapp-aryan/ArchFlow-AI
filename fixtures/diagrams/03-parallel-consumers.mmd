@@ -1,0 +1,11 @@
+flowchart LR
+    order["Order Service"]
+    kafka["Kafka"]
+    c1["Consumer 1"]
+    c2["Consumer 2"]
+    pg["PostgreSQL"]
+    order -->|"produce"| kafka
+    kafka -->|"consume"| c1
+    kafka -->|"consume"| c2
+    c1 -->|"write"| pg
+    c2 -->|"write"| pg

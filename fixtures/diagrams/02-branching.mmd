@@ -1,0 +1,11 @@
+flowchart LR
+    gw["Gateway"]
+    orders["Orders"]
+    users["Users"]
+    billing["Billing"]
+    db["Shared DB"]
+    gw --> orders
+    gw --> users
+    gw --> billing
+    orders --> db
+    billing --> db

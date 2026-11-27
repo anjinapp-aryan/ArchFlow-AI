@@ -1,0 +1,8 @@
+flowchart LR
+    web["Web App"]
+    api["API"]
+    cache["Cache"]
+    web -->|"REST"| api
+    web -.->|"gRPC"| api
+    api -.->|"callback"| web
+    api -->|"get"| cache

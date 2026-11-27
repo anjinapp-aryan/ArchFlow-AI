@@ -1,0 +1,74 @@
+{
+  "AnimatedDiagrams-MIT.txt": {
+    "sha256": "b467df46b73b5f624f74ae0691104cac6b80fd269a4627265dd0dd4ab03bb239",
+    "covers": "AnimatedDiagrams engine (ad_engine, Player.cpp)"
+  },
+  "nlohmann-json-MIT.txt": {
+    "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14",
+    "covers": "nlohmann/json 3.11.3"
+  },
+  "Emscripten-MIT-NCSA.txt": {
+    "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+    "covers": "Emscripten runtime glue, libemmalloc, libemcc, libc glue (emscripten_*.c)"
+  },
+  "Emscripten-AUTHORS.txt": {
+    "sha256": "3fb38cc87b2b57a2a1aae3ad2e984c3bc23cf7441d20e6897739fbc3f96414c4",
+    "covers": "Emscripten copyright holders"
+  },
+  "musl-COPYRIGHT.txt": {
+    "sha256": "b870108ec5e7790e9f9919064f1b9421d62d5f9b0e6c230c6adf7ea2da62e97b",
+    "covers": "musl libc (MIT + listed permissive third-party parts) -> libc.a / libc_optz.a members"
+  },
+  "LLVM-libcxx-Apache-2.0-with-LLVM-exception.txt": {
+    "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+    "covers": "libc++ headers instantiated in the engine (std::string, vector, ...)"
+  },
+  "LLVM-libunwind-Apache-2.0-with-LLVM-exception.txt": {
+    "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+    "covers": "libunwind-legacyexcept.a (Unwind-wasm.o)"
+  },
+  "LLVM-compiler-rt-Apache-2.0-with-LLVM-exception.txt": {
+    "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+    "covers": "libclang_rt.builtins.a members"
+  },
+  "LLVM-llvm-libc-Apache-2.0-with-LLVM-exception.txt": {
+    "sha256": "ebcd9bbf783a73d05c53ba4d586b8d5813dcdf3bbec50265860ccc885e606f47",
+    "covers": "llvm-libc sources in the Emscripten sysroot (not observed in the link map; kept for completeness)"
+  },
+  "zod-MIT.txt": {
+    "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
+    "covers": "zod 4.6.7 (zod/mini) - canonical model validation"
+  },
+  "saxes-ISC.txt": {
+    "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e",
+    "covers": "saxes 6.0.0 - XML parser in the draw.io importer (the npm tarball has no LICENSE file; text taken from the repository at the published gitHead 211fa0eb, see scripts/license-sources/README.md)"
+  },
+  "xmlchars-MIT.txt": {
+    "sha256": "45d196313c2647d313cc65ca9b093d2d6974b64d35ee7346f2c60c9d518dff2c",
+    "covers": "xmlchars 2.2.0 - dependency of saxes"
+  },
+  "dagre-MIT.txt": {
+    "sha256": "6a349742a6cb219d5a2fc8d0844f6d89a6efc62e20c664450d884fc7ff2d6015",
+    "covers": "@dagrejs/dagre 3.1.3 - Mermaid flowchart layout"
+  },
+  "webm-muxer-MIT.txt": {
+    "sha256": "1619f937fa43f768d38d2bfb35d228258e0dffe1f71c4202b338df20e68ff680",
+    "covers": "webm-muxer 5.1.4 - WebM export in the web app"
+  },
+  "mp4-muxer-MIT.txt": {
+    "sha256": "75c54aae7ef6ad652f684f9dd3b71e4dcef86ccebd88cf441ceed7f5eec037c5",
+    "covers": "mp4-muxer 5.2.2 - MP4 export in the web app"
+  },
+  "graphlib-MIT.txt": {
+    "sha256": "6a349742a6cb219d5a2fc8d0844f6d89a6efc62e20c664450d884fc7ff2d6015",
+    "covers": "@dagrejs/graphlib 4.0.6 - dependency of dagre"
+  },
+  "nanosvg-Zlib.txt": {
+    "sha256": "1286c303df2673ad51b1ec7faa3ffaedcb0d874c81be309c416e30a3325b9eba",
+    "covers": "nanosvg.h (header-only, compiled into ad_engine); also credits AGG 2.4 and canvg-derived code"
+  },
+  "ENGINE_LINK_INPUTS.txt": {
+    "sha256": "e3fd6827dadfb26cf0fcfded392dfd794e63351cc83e5d0ade3b51f11a1bc734",
+    "covers": "archive members linked into the WASM (wasm-ld map)"
+  }
+}

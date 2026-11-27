@@ -1,0 +1,7 @@
+flowchart LR
+    client["Client"]
+    server["Server"]
+    db["Database"]
+    client <-->|"websocket"| server
+    server -->|"query"| db
+    db -.->|"rows"| server

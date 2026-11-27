@@ -1,0 +1,77 @@
+{
+  "id": "04-multiple-connectors",
+  "title": "Multiple connectors between the same components",
+  "categories": [
+    "multiple-connectors"
+  ],
+  "nodes": [
+    {
+      "key": "web",
+      "label": "Web App",
+      "x": 40,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "api",
+      "label": "API",
+      "x": 300,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "cache",
+      "label": "Cache",
+      "x": 560,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "web",
+      "to": "api",
+      "label": "REST",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "web",
+      "to": "api",
+      "label": "gRPC",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "api",
+      "to": "web",
+      "label": "callback",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "e4",
+      "from": "api",
+      "to": "cache",
+      "label": "get",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

@@ -1,0 +1,15 @@
+flowchart LR
+    internet["Internet"]
+    subgraph vpc["VPC"]
+        lb["Load Balancer"]
+        subgraph priv["Private subnet"]
+            app1["App 1"]
+            app2["App 2"]
+            db["Database"]
+        end
+    end
+    internet -->|"443"| lb
+    lb --> app1
+    lb --> app2
+    app1 --> db
+    app2 --> db

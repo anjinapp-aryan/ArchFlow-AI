@@ -1,0 +1,115 @@
+{
+  "schema": "archflow/canonical@1",
+  "diagram": {
+    "id": "linear-3",
+    "name": "Linear three",
+    "nodes": [
+      {
+        "id": "a b<script>",
+        "label": "Client",
+        "kind": "client",
+        "x": 40,
+        "y": 60,
+        "w": 140,
+        "h": 64
+      },
+      {
+        "id": "b",
+        "label": "API",
+        "kind": "gateway",
+        "x": 260,
+        "y": 60,
+        "w": 140,
+        "h": 64
+      },
+      {
+        "id": "c",
+        "label": "DB",
+        "kind": "db",
+        "x": 480,
+        "y": 60,
+        "w": 140,
+        "h": 74
+      }
+    ],
+    "edges": [
+      {
+        "id": "ab",
+        "from": "a",
+        "to": "b",
+        "label": "HTTPS"
+      },
+      {
+        "id": "bc",
+        "from": "b",
+        "to": "c",
+        "label": "SQL"
+      }
+    ],
+    "groups": []
+  },
+  "scenario": {
+    "id": "linear-3-main",
+    "durationMs": 5000,
+    "flows": [
+      {
+        "id": "f1"
+      }
+    ],
+    "events": [
+      {
+        "type": "packet",
+        "id": "p1",
+        "t": 300,
+        "durationMs": 900,
+        "flowId": "f1",
+        "from": "a",
+        "to": "b",
+        "variant": "request",
+        "label": "GET"
+      },
+      {
+        "type": "node_state",
+        "id": "s1",
+        "t": 1200,
+        "durationMs": 700,
+        "flowId": "f1",
+        "nodeId": "b",
+        "state": "active"
+      },
+      {
+        "type": "packet",
+        "id": "p2",
+        "t": 1300,
+        "durationMs": 900,
+        "flowId": "f1",
+        "from": "b",
+        "to": "c",
+        "variant": "request",
+        "label": "SELECT"
+      },
+      {
+        "type": "packet",
+        "id": "p3",
+        "t": 2400,
+        "durationMs": 900,
+        "flowId": "f1",
+        "from": "c",
+        "to": "b",
+        "variant": "response",
+        "label": "rows"
+      },
+      {
+        "type": "packet",
+        "id": "p4",
+        "t": 3400,
+        "durationMs": 900,
+        "flowId": "f1",
+        "from": "b",
+        "to": "a",
+        "variant": "success",
+        "label": "200"
+      }
+    ]
+  }
+}

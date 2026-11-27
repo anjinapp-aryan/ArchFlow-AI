@@ -1,0 +1,379 @@
+{
+  "schema": "archflow/canonical@1",
+  "diagram": {
+    "id": "order-flow",
+    "name": "Order flow benchmark",
+    "nodes": [
+      {
+        "id": "user",
+        "label": "User",
+        "kind": "user",
+        "x": 20,
+        "y": 170,
+        "w": 110,
+        "h": 60
+      },
+      {
+        "id": "gw",
+        "label": "API Gateway",
+        "kind": "gateway",
+        "x": 180,
+        "y": 170,
+        "w": 130,
+        "h": 60
+      },
+      {
+        "id": "auth",
+        "label": "Authentication Service",
+        "kind": "service",
+        "x": 180,
+        "y": 40,
+        "w": 160,
+        "h": 60
+      },
+      {
+        "id": "order",
+        "label": "Order Service",
+        "kind": "service",
+        "x": 380,
+        "y": 170,
+        "w": 130,
+        "h": 60
+      },
+      {
+        "id": "kafka",
+        "label": "Kafka",
+        "kind": "queue",
+        "x": 560,
+        "y": 170,
+        "w": 110,
+        "h": 60
+      },
+      {
+        "id": "c1",
+        "label": "Consumer 1",
+        "kind": "service",
+        "x": 720,
+        "y": 100,
+        "w": 120,
+        "h": 60
+      },
+      {
+        "id": "c2",
+        "label": "Consumer 2",
+        "kind": "service",
+        "x": 720,
+        "y": 250,
+        "w": 120,
+        "h": 60
+      },
+      {
+        "id": "pg",
+        "label": "PostgreSQL",
+        "kind": "db",
+        "x": 900,
+        "y": 170,
+        "w": 120,
+        "h": 60
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": "user",
+        "to": "gw",
+        "label": "HTTPS",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e2",
+        "from": "gw",
+        "to": "auth",
+        "label": "validate",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e3",
+        "from": "gw",
+        "to": "order",
+        "label": "REST",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e4",
+        "from": "order",
+        "to": "kafka",
+        "label": "produce",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e5",
+        "from": "kafka",
+        "to": "c1",
+        "label": "consume",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e6",
+        "from": "kafka",
+        "to": "c2",
+        "label": "consume",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e7",
+        "from": "c1",
+        "to": "pg",
+        "label": "write",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      },
+      {
+        "id": "e8",
+        "from": "c2",
+        "to": "pg",
+        "label": "write",
+        "direction": "forward",
+        "arrowHead": "triangle",
+        "stroke": "solid",
+        "routing": "curved"
+      }
+    ],
+    "groups": []
+  },
+  "scenario": {
+    "id": "order-flow-main",
+    "name": "Order creation with consumer failure and retry",
+    "durationMs": 16000,
+    "flows": [
+      {
+        "id": "request"
+      },
+      {
+        "id": "auth",
+        "parentFlowId": "request"
+      },
+      {
+        "id": "publish",
+        "parentFlowId": "request"
+      },
+      {
+        "id": "consumer-1",
+        "parentFlowId": "publish"
+      },
+      {
+        "id": "consumer-2",
+        "parentFlowId": "publish"
+      }
+    ],
+    "events": [
+      {
+        "type": "packet",
+        "id": "a1",
+        "t": 300,
+        "durationMs": 900,
+        "flowId": "request",
+        "from": "user",
+        "to": "gw",
+        "variant": "request",
+        "label": "POST /orders"
+      },
+      {
+        "type": "packet",
+        "id": "a2",
+        "t": 1300,
+        "durationMs": 800,
+        "flowId": "auth",
+        "from": "gw",
+        "to": "auth",
+        "variant": "request",
+        "label": "validate"
+      },
+      {
+        "type": "packet",
+        "id": "a3",
+        "t": 2200,
+        "durationMs": 700,
+        "flowId": "auth",
+        "from": "auth",
+        "to": "gw",
+        "variant": "response",
+        "label": "ok",
+        "respondsTo": "a2"
+      },
+      {
+        "type": "packet",
+        "id": "a4",
+        "t": 3000,
+        "durationMs": 900,
+        "flowId": "request",
+        "from": "gw",
+        "to": "order",
+        "variant": "request",
+        "label": "create"
+      },
+      {
+        "type": "packet",
+        "id": "a5",
+        "t": 4000,
+        "durationMs": 900,
+        "flowId": "publish",
+        "from": "order",
+        "to": "kafka",
+        "variant": "event",
+        "label": "OrderCreated"
+      },
+      {
+        "type": "packet",
+        "id": "a6",
+        "t": 5000,
+        "durationMs": 900,
+        "flowId": "consumer-1",
+        "from": "kafka",
+        "to": "c1",
+        "variant": "event",
+        "label": "consume"
+      },
+      {
+        "type": "packet",
+        "id": "a7",
+        "t": 5000,
+        "durationMs": 900,
+        "flowId": "consumer-2",
+        "from": "kafka",
+        "to": "c2",
+        "variant": "event",
+        "label": "consume"
+      },
+      {
+        "type": "node_state",
+        "id": "s1",
+        "t": 5000,
+        "durationMs": 1500,
+        "flowId": "consumer-1",
+        "nodeId": "c1",
+        "state": "active"
+      },
+      {
+        "type": "node_state",
+        "id": "s2",
+        "t": 5000,
+        "durationMs": 3500,
+        "flowId": "consumer-2",
+        "nodeId": "c2",
+        "state": "down"
+      },
+      {
+        "type": "packet",
+        "id": "a8",
+        "t": 6100,
+        "durationMs": 800,
+        "flowId": "consumer-1",
+        "from": "c1",
+        "to": "pg",
+        "variant": "request",
+        "label": "INSERT"
+      },
+      {
+        "type": "packet",
+        "id": "a9",
+        "t": 6100,
+        "durationMs": 800,
+        "flowId": "consumer-2",
+        "from": "c2",
+        "to": "pg",
+        "variant": "error",
+        "label": "timeout"
+      },
+      {
+        "type": "packet",
+        "id": "a10",
+        "t": 7600,
+        "durationMs": 800,
+        "flowId": "consumer-2",
+        "from": "c2",
+        "to": "pg",
+        "variant": "retry",
+        "label": "retry",
+        "attempt": 2,
+        "retryOf": "a9"
+      },
+      {
+        "type": "node_state",
+        "id": "s3",
+        "t": 8500,
+        "durationMs": 2000,
+        "flowId": "consumer-2",
+        "nodeId": "c2",
+        "state": "success",
+        "recovers": "s2"
+      },
+      {
+        "type": "packet",
+        "id": "a11",
+        "t": 8500,
+        "durationMs": 800,
+        "flowId": "consumer-1",
+        "from": "pg",
+        "to": "c1",
+        "variant": "success",
+        "label": "ack",
+        "respondsTo": "a8"
+      },
+      {
+        "type": "packet",
+        "id": "a12",
+        "t": 9500,
+        "durationMs": 900,
+        "flowId": "request",
+        "from": "order",
+        "to": "gw",
+        "variant": "response",
+        "label": "201",
+        "respondsTo": "a4"
+      },
+      {
+        "type": "packet",
+        "id": "a13",
+        "t": 10500,
+        "durationMs": 900,
+        "flowId": "request",
+        "from": "gw",
+        "to": "user",
+        "variant": "success",
+        "label": "201 Created",
+        "respondsTo": "a1"
+      },
+      {
+        "type": "node_state",
+        "id": "s4",
+        "t": 11400,
+        "durationMs": 3000,
+        "flowId": "request",
+        "nodeId": "user",
+        "state": "success"
+      }
+    ],
+    "diagramId": "order-flow"
+  }
+}

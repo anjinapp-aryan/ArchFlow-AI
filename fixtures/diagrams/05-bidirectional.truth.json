@@ -1,0 +1,69 @@
+{
+  "id": "05-bidirectional",
+  "title": "Bidirectional request/response",
+  "categories": [
+    "bidirectional",
+    "request-response"
+  ],
+  "nodes": [
+    {
+      "key": "client",
+      "label": "Client",
+      "x": 40,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "server",
+      "label": "Server",
+      "x": 300,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "db",
+      "label": "Database",
+      "x": 560,
+      "y": 100,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "client",
+      "to": "server",
+      "label": "websocket",
+      "direction": "both",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "server",
+      "to": "db",
+      "label": "query",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "db",
+      "to": "server",
+      "label": "rows",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

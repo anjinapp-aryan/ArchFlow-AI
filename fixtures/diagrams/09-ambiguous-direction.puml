@@ -1,0 +1,11 @@
+@startuml
+title Missing or ambiguous arrow directions
+left to right direction
+component "Alpha" as a
+component "Beta" as b
+component "Gamma" as c
+component "Delta" as d
+a -- b : plain line
+b <-- c : arrow at source
+b --> d : normal
+@enduml

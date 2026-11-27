@@ -1,0 +1,10 @@
+@startuml
+title Bidirectional request/response
+left to right direction
+component "Client" as client
+component "Server" as server
+component "Database" as db
+client <--> server : websocket
+server --> db : query
+db ..> server : rows
+@enduml

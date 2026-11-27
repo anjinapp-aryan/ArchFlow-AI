@@ -1,0 +1,138 @@
+{
+  "id": "17-plantuml-sequence",
+  "title": "PlantUML sequence diagram: actor, aliases, box, activation, failed message, alt",
+  "categories": [
+    "plantuml",
+    "sequence",
+    "request-response"
+  ],
+  "nodes": [
+    {
+      "key": "U",
+      "label": "User",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "W",
+      "label": "Web App",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "API",
+      "label": "Orders API",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "backend"
+    },
+    {
+      "key": "DB",
+      "label": "Orders DB",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "backend"
+    }
+  ],
+  "groups": [
+    {
+      "key": "backend",
+      "label": "Backend",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "edges": [
+    {
+      "key": "s1",
+      "from": "U",
+      "to": "W",
+      "label": "open checkout",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "s2",
+      "from": "W",
+      "to": "API",
+      "label": "POST /orders",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "s3",
+      "from": "API",
+      "to": "DB",
+      "label": "INSERT",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "s4",
+      "from": "DB",
+      "to": "API",
+      "label": "ok",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "s5",
+      "from": "API",
+      "to": "DB",
+      "label": "audit",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "s6",
+      "from": "API",
+      "to": "W",
+      "label": "201",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "s7",
+      "from": "API",
+      "to": "W",
+      "label": "500",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "s8",
+      "from": "W",
+      "to": "U",
+      "label": "confirmation",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": false,
+    "mermaid": false,
+    "plantuml": "sequence"
+  },
+  "raw": {
+    "plantuml": "@startuml\ntitle Checkout\nactor User as U\nparticipant \"Web App\" as W\nbox \"Backend\"\n  participant \"Orders API\" as API\n  database \"Orders DB\" as DB\nend box\nU -> W : open checkout\nW -> API : POST /orders\nactivate API\nAPI -> DB : INSERT\nDB --> API : ok\nAPI ->x DB : audit\nalt success\n  API --> W : 201\nelse failure\n  API --> W : 500\nend\nW --> U : confirmation\ndeactivate API\n@enduml\n"
+  }
+}

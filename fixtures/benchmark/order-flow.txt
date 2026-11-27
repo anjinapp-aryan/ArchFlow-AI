@@ -1,0 +1,8 @@
+title: Order flow benchmark
+User -> API Gateway : POST /orders
+API Gateway -> Authentication Service : validate
+API Gateway -> Order Service : create order
+Order Service ..> Kafka : OrderCreated
+Kafka ..> Consumer 1, Consumer 2 : consume
+Consumer 1 -> PostgreSQL : INSERT
+fail: Consumer 1 -> PostgreSQL timeout retries 1

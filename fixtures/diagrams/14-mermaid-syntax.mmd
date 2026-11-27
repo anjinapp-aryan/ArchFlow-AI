@@ -1,0 +1,25 @@
+---
+title: Checkout platform
+---
+%%{init: {"theme": "dark"}}%%
+graph TD
+    %% clients
+    U((User)) --> GW{{"API #quot;Edge#quot; Gateway"}}
+    GW -- validate --> AUTH[Auth Service]:::svc
+    GW ==> ORD(Order Service) --> PAY[/Payments/]
+    ORD & PAY --> DB[(Orders DB)]
+    ORD -.->|emit| Q>Event Queue]
+    Q o--o MON[Monitor]
+    MON ~~~ DB
+    subgraph "Edge tier"
+      GW
+    end
+    subgraph core [Core services]
+      ORD
+      PAY
+    end
+    U --> core
+    classDef svc fill:#eef
+    class AUTH svc
+    style DB fill:#fdd;
+    click AUTH "https://example.com"

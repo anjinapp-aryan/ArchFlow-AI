@@ -1,0 +1,12 @@
+@startuml
+title Dashed, dotted-style and curved connectors
+left to right direction
+component "Source" as a
+component "Worker" as b
+component "Queue" as c
+component "Sink" as d
+a --> b : sync
+b ..> c : async
+c ..> d : drain
+a --> d : audit
+@enduml

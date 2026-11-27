@@ -1,0 +1,174 @@
+{
+  "id": "14-mermaid-syntax",
+  "title": "Mermaid flowchart syntax variety (shapes, chains, fan-out, text links, subgraphs, styling)",
+  "categories": [
+    "mermaid-syntax",
+    "nested-groups",
+    "labeled-connectors",
+    "dashed",
+    "bidirectional"
+  ],
+  "nodes": [
+    {
+      "key": "U",
+      "label": "User",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "GW",
+      "label": "API \"Edge\" Gateway",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "edge"
+    },
+    {
+      "key": "AUTH",
+      "label": "Auth Service",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "ORD",
+      "label": "Order Service",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "core"
+    },
+    {
+      "key": "PAY",
+      "label": "Payments",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60,
+      "group": "core"
+    },
+    {
+      "key": "DB",
+      "label": "Orders DB",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "Q",
+      "label": "Event Queue",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "MON",
+      "label": "Monitor",
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [
+    {
+      "key": "edge",
+      "label": "Edge tier",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    {
+      "key": "core",
+      "label": "Core services",
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "edges": [
+    {
+      "key": "l1",
+      "from": "U",
+      "to": "GW",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l2",
+      "from": "GW",
+      "to": "AUTH",
+      "label": "validate",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l3",
+      "from": "GW",
+      "to": "ORD",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l4",
+      "from": "ORD",
+      "to": "PAY",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l5",
+      "from": "ORD",
+      "to": "DB",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l6",
+      "from": "PAY",
+      "to": "DB",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "l7",
+      "from": "ORD",
+      "to": "Q",
+      "label": "emit",
+      "direction": "forward",
+      "stroke": "dashed",
+      "routing": "straight"
+    },
+    {
+      "key": "l8",
+      "from": "Q",
+      "to": "MON",
+      "direction": "both",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": false,
+    "mermaid": "flowchart"
+  },
+  "raw": {
+    "mermaid": "---\ntitle: Checkout platform\n---\n%%{init: {\"theme\": \"dark\"}}%%\ngraph TD\n    %% clients\n    U((User)) --> GW{{\"API #quot;Edge#quot; Gateway\"}}\n    GW -- validate --> AUTH[Auth Service]:::svc\n    GW ==> ORD(Order Service) --> PAY[/Payments/]\n    ORD & PAY --> DB[(Orders DB)]\n    ORD -.->|emit| Q>Event Queue]\n    Q o--o MON[Monitor]\n    MON ~~~ DB\n    subgraph \"Edge tier\"\n      GW\n    end\n    subgraph core [Core services]\n      ORD\n      PAY\n    end\n    U --> core\n    classDef svc fill:#eef\n    class AUTH svc\n    style DB fill:#fdd;\n    click AUTH \"https://example.com\"\n"
+  }
+}

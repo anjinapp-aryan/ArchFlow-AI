@@ -1,0 +1,61 @@
+{
+  "id": "12-linear-compressed",
+  "title": "Linear architecture saved as a compressed draw.io page",
+  "categories": [
+    "linear",
+    "compressed"
+  ],
+  "nodes": [
+    {
+      "key": "a",
+      "label": "Client",
+      "x": 40,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "b",
+      "label": "Gateway",
+      "x": 220,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c",
+      "label": "Service",
+      "x": 400,
+      "y": 40,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "a",
+      "to": "b",
+      "label": "HTTPS",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "b",
+      "to": "c",
+      "label": "gRPC",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": false,
+    "drawioCompressed": true
+  }
+}

@@ -1,0 +1,21 @@
+node_modules/
+build/
+.cache/
+dist/
+coverage/
+*.log
+.tools/
+artifacts/
+# research clones, build trees and binaries (Phase 0/1.0 evidence; large)
+research/upstream/
+research/binaries/
+research/build/
+research/tools/
+poc/**/node_modules/
+*.tsbuildinfo
+.vitest/
+.wrangler/
+research/spikes/*/node_modules/
+
+# tesseract.js language data downloaded at runtime by the OCR spike (regenerable, not ours)
+*.traineddata

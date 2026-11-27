@@ -1,0 +1,22 @@
+{
+  "name": "@archflow/web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@archflow/canonical-model": "0.1.0",
+    "@archflow/diagram-importers": "0.1.0",
+    "@archflow/engine-host": "0.1.0",
+    "@archflow/renderer-adapter": "0.1.0",
+    "@archflow/scenario-synthesizer": "0.1.0",
+    "mp4-muxer": "5.2.2",
+    "webm-muxer": "5.1.4"
+  },
+  "devDependencies": {
+    "@archflow/qa": "0.1.0"
+  }
+}

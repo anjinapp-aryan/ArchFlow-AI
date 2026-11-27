@@ -1,0 +1,14 @@
+@startuml
+title Parallel consumers
+left to right direction
+component "Order Service" as order
+component "Kafka" as kafka
+component "Consumer 1" as c1
+component "Consumer 2" as c2
+component "PostgreSQL" as pg
+order --> kafka : produce
+kafka --> c1 : consume
+kafka --> c2 : consume
+c1 --> pg : write
+c2 --> pg : write
+@enduml

@@ -1,0 +1,17 @@
+flowchart LR
+    user["User"]
+    gw["API Gateway"]
+    auth["Authentication Service"]
+    order["Order Service"]
+    kafka["Kafka"]
+    c1["Consumer 1"]
+    c2["Consumer 2"]
+    pg["PostgreSQL"]
+    user -->|"HTTPS"| gw
+    gw -->|"validate"| auth
+    gw -->|"REST"| order
+    order -->|"produce"| kafka
+    kafka -->|"consume"| c1
+    kafka -->|"consume"| c2
+    c1 -->|"write"| pg
+    c2 -->|"write"| pg

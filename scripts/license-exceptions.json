@@ -1,0 +1,7 @@
+{
+  "lightningcss@1.33.0": "MPL-2.0 (file-level copyleft). Dev-only: pulled by vitest -> vite. Unmodified, not bundled or distributed with the product. Reviewed 2026-11-25.",
+  "lightningcss-win32-x64-msvc@1.33.0": "Platform binary of lightningcss; same rationale. Other platforms install their own variant (same licence); add them here if CI flags them.",
+  "lightningcss-linux-x64-gnu@1.33.0": "Platform binary of lightningcss; same rationale (dev-only, MPL-2.0, unmodified, not distributed).",
+  "spdx-exceptions@2.5.0": "CC-BY-3.0 data set (SPDX exception list). Dev-only: pulled by license-checker. Not distributed.",
+  "spdx-ranges@2.1.1": "(MIT AND CC-BY-3.0) SPDX range data. Dev-only: pulled by license-checker. Not distributed."
+}

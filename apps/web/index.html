@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArchFlow AI — animate your architecture diagram</title>
+    <meta
+      name="description"
+      content="Turn a draw.io or Mermaid architecture diagram, or a short description, into an animation of requests, parallel flows, failures and retries. Runs entirely in your browser."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="{{CSS}}" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+          <use href="favicon.svg#mark" />
+        </svg>
+        <div>
+          <h1>ArchFlow AI</h1>
+          <p class="tag">Animate how requests travel through your architecture</p>
+        </div>
+      </div>
+      <p
+        class="privacy"
+        title="Nothing is uploaded: import, animation and video export run on your device."
+      >
+        Runs locally · nothing is uploaded
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="panel source" aria-labelledby="src-h">
+        <div class="panel-head">
+          <h2 id="src-h">1 · Your diagram</h2>
+          <label class="examples">
+            <span class="sr-only">Load an example</span>
+            <select id="examples">
+              <option value="">Examples…</option>
+            </select>
+          </label>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Source format">
+          <button role="tab" id="tab-text" data-kind="text" aria-selected="true">Describe</button>
+          <button role="tab" id="tab-mermaid" data-kind="mermaid" aria-selected="false">
+            Mermaid
+          </button>
+          <button role="tab" id="tab-drawio" data-kind="drawio" aria-selected="false">
+            draw.io
+          </button>
+          <button role="tab" id="tab-plantuml" data-kind="plantuml" aria-selected="false">
+            PlantUML
+          </button>
+          <button role="tab" id="tab-json" data-kind="json" aria-selected="false">JSON</button>
+        </div>
+        <div id="drop" class="drop">
+          <label for="source" class="sr-only">Diagram source</label>
+          <textarea id="source" spellcheck="false" autocomplete="off"></textarea>
+          <p class="hint" id="hint"></p>
+        </div>
+        <div class="row">
+          <button id="animate" class="primary">Animate</button>
+          <label class="file">
+            <input
+              type="file"
+              id="file"
+              accept=".drawio,.xml,.dio,.svg,.mmd,.mermaid,.puml,.plantuml,.pu,.iuml,.md,.txt,.json"
+            />
+            <span>Open file…</span>
+          </label>
+        </div>
+
+        <h2 class="sub">2 · Scenario</h2>
+        <p id="origin" class="muted">Animate a diagram to configure its scenario.</p>
+        <div class="grid" id="scenario-controls" hidden>
+          <label
+            >Starts at
+            <select id="entry"></select
+          ></label>
+          <label
+            >Inject a failure on
+            <select id="fail-pair">
+              <option value="">no failure</option>
+            </select></label
+          >
+          <label
+            >Failure kind
+            <select id="fail-mode">
+              <option value="timeout">timeout</option>
+              <option value="error">error</option>
+            </select>
+          </label>
+          <label>Retries <input id="fail-retries" type="number" min="1" max="9" value="1" /></label>
+          <label class="check"
+            ><input type="checkbox" id="regenerate" /> Generate from the diagram (ignore the source
+            scenario)</label
+          >
+          <button id="apply">Apply</button>
+        </div>
+
+        <h2 class="sub">Messages <span id="issue-count" class="badge"></span></h2>
+        <ul id="issues" class="issues" aria-live="polite"></ul>
+      </section>
+
+      <section class="panel stage" aria-labelledby="play-h">
+        <h2 id="play-h" class="sr-only">Animation</h2>
+        <div class="screen">
+          <canvas id="canvas" aria-label="Architecture animation" tabindex="0"></canvas>
+          <p id="placeholder" class="placeholder">
+            Pick an example or paste a diagram, then press <b>Animate</b>.
+          </p>
+        </div>
+        <div class="controls" role="group" aria-label="Playback">
+          <button id="prev" title="Previous event (Shift+←)" aria-label="Previous event">⏮</button>
+          <button id="back" title="Back one frame (,)" aria-label="Back one frame">‹</button>
+          <button id="play" class="primary" title="Play / pause (Space)" aria-label="Play">
+            ▶
+          </button>
+          <button id="fwd" title="Forward one frame (.)" aria-label="Forward one frame">›</button>
+          <button id="next" title="Next event (Shift+→)" aria-label="Next event">⏭</button>
+          <input
+            id="seek"
+            type="range"
+            min="0"
+            max="1000"
+            step="any"
+            value="0"
+            aria-label="Position"
+          />
+          <span id="time" class="time">0.0 / 0.0 s</span>
+          <label class="speed"
+            >Speed
+            <select id="speed">
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="loop" checked /> Loop</label>
+        </div>
+
+        <div class="export">
+          <h2 class="sub">3 · Export</h2>
+          <div class="row">
+            <label
+              >Format
+              <select id="format">
+                <option value="webm">WebM (VP9)</option>
+                <option value="mp4">MP4 (H.264)</option>
+              </select>
+            </label>
+            <label
+              >Size
+              <select id="size">
+                <option value="1280x720">1280 × 720</option>
+                <option value="1920x1080">1920 × 1080</option>
+                <option value="1080x1080">1080 × 1080</option>
+              </select>
+            </label>
+            <label
+              >FPS
+              <select id="fps">
+                <option value="30">30</option>
+                <option value="60">60</option>
+              </select>
+            </label>
+            <button id="export" class="primary">Export video</button>
+            <button id="cancel" hidden>Cancel</button>
+            <button
+              id="download-json"
+              title="The validated canonical document (diagram + scenario)"
+            >
+              Download JSON
+            </button>
+          </div>
+          <progress id="progress" max="1" value="0" hidden></progress>
+          <p id="export-msg" class="muted" aria-live="polite"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>ArchFlow AI · MIT licence</span>
+      <a href="licenses/THIRD_PARTY_NOTICES.txt">Third-party notices</a>
+      <span class="muted"
+        >Keys: Space play/pause · ←/→ 1 s · Shift+←/→ events · , . frames · Home/End</span
+      >
+    </footer>
+    <script src="{{ENGINE}}"></script>
+    <script src="{{APP}}"></script>
+  </body>
+</html>

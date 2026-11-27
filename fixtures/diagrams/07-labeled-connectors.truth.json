@@ -1,0 +1,85 @@
+{
+  "id": "07-labeled-connectors",
+  "title": "Labeled connectors with special characters",
+  "categories": [
+    "labeled-connectors"
+  ],
+  "nodes": [
+    {
+      "key": "a",
+      "label": "Cart & Checkout",
+      "x": 40,
+      "y": 60,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "b",
+      "label": "Pricing",
+      "x": 300,
+      "y": 60,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "c",
+      "label": "Café Service",
+      "x": 40,
+      "y": 220,
+      "w": 120,
+      "h": 60
+    },
+    {
+      "key": "d",
+      "label": "Ledger",
+      "x": 300,
+      "y": 220,
+      "w": 120,
+      "h": 60
+    }
+  ],
+  "groups": [],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "a",
+      "to": "b",
+      "label": "GET /prices/{sku}",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "a",
+      "to": "c",
+      "label": "ok (200)",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "c",
+      "to": "d",
+      "label": "débit → crédit",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e4",
+      "from": "b",
+      "to": "d",
+      "label": "a & b: 50%",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "id": "06-nested-groups",
+  "title": "Nested and grouped components",
+  "categories": [
+    "nested-groups"
+  ],
+  "nodes": [
+    {
+      "key": "internet",
+      "label": "Internet",
+      "x": 20,
+      "y": 400,
+      "w": 120,
+      "h": 50
+    },
+    {
+      "key": "lb",
+      "label": "Load Balancer",
+      "x": 100,
+      "y": 120,
+      "w": 120,
+      "h": 50,
+      "group": "vpc"
+    },
+    {
+      "key": "app1",
+      "label": "App 1",
+      "x": 280,
+      "y": 150,
+      "w": 100,
+      "h": 50,
+      "group": "priv"
+    },
+    {
+      "key": "app2",
+      "label": "App 2",
+      "x": 280,
+      "y": 230,
+      "w": 100,
+      "h": 50,
+      "group": "priv"
+    },
+    {
+      "key": "db",
+      "label": "Database",
+      "x": 460,
+      "y": 190,
+      "w": 100,
+      "h": 50,
+      "group": "priv"
+    }
+  ],
+  "groups": [
+    {
+      "key": "vpc",
+      "label": "VPC",
+      "x": 60,
+      "y": 60,
+      "w": 560,
+      "h": 300
+    },
+    {
+      "key": "priv",
+      "label": "Private subnet",
+      "x": 250,
+      "y": 110,
+      "w": 340,
+      "h": 220,
+      "parent": "vpc"
+    }
+  ],
+  "edges": [
+    {
+      "key": "e1",
+      "from": "internet",
+      "to": "lb",
+      "label": "443",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e2",
+      "from": "lb",
+      "to": "app1",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e3",
+      "from": "lb",
+      "to": "app2",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e4",
+      "from": "app1",
+      "to": "db",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    },
+    {
+      "key": "e5",
+      "from": "app2",
+      "to": "db",
+      "direction": "forward",
+      "stroke": "solid",
+      "routing": "straight"
+    }
+  ],
+  "danglingEdges": 0,
+  "formats": {
+    "drawio": true,
+    "mermaid": "flowchart"
+  }
+}

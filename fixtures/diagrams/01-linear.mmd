@@ -1,0 +1,8 @@
+flowchart LR
+    client["Client"]
+    gw["API Gateway"]
+    svc["Order Service"]
+    db["PostgreSQL"]
+    client -->|"HTTPS"| gw
+    gw -->|"REST"| svc
+    svc -->|"SQL"| db
