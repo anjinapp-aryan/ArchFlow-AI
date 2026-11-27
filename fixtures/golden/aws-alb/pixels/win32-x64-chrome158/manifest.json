@@ -1,0 +1,62 @@
+{
+  "schema": "archflow/golden-pixels@1",
+  "fixture": "aws-alb",
+  "environment": "win32-x64-chrome158",
+  "frames": {
+    "0": {
+      "sha256": "d6c79adc14d3f4e653afbfc3132b0f4921be231861778493a0373ae97f33e617",
+      "width": 1280,
+      "height": 560
+    },
+    "900": {
+      "sha256": "30a4e239f6295b1b7c634570939487e8e73b428fed46996b56abb3cfddbee419",
+      "width": 1280,
+      "height": 560
+    },
+    "1500": {
+      "sha256": "7b02e8b00c5b5f9287169432cb4cdb2429747785e0f3ce33a471c59fe8acaa38",
+      "width": 1280,
+      "height": 560
+    },
+    "2100": {
+      "sha256": "029fccbd8f443c4f56ec5ffccf4c8ea6278bb4f6c67936fd3104d4cdc538c591",
+      "width": 1280,
+      "height": 560
+    },
+    "2700": {
+      "sha256": "bd112db9da23335b625212c76a48ebc2f7a9a0633e3b359fe7e8c0e57800404a",
+      "width": 1280,
+      "height": 560
+    },
+    "6500": {
+      "sha256": "ed6538ce1224693feecae222831bae1e6918043ef7029afabf5a4641e1615dc1",
+      "width": 1280,
+      "height": 560
+    },
+    "7400": {
+      "sha256": "363d20910ea5b429f18ac2c36f980520502a95f81cc287a7edff8bd2252c4834",
+      "width": 1280,
+      "height": 560
+    },
+    "8100": {
+      "sha256": "54bb35909c02a89abf0bbb7b68e29c22a0d4539d017dd3bf2fad91f9fb5b33d3",
+      "width": 1280,
+      "height": 560
+    },
+    "12300": {
+      "sha256": "0917b5309231cb8a1902fdd7d854c10640739d2ae2a06f7550904089e99925ef",
+      "width": 1280,
+      "height": 560
+    },
+    "13500": {
+      "sha256": "5210232a8a7c6ac62880c923130c8cc771bb58ac858faa88a885e3c6ffcd71b6",
+      "width": 1280,
+      "height": 560
+    },
+    "17500": {
+      "sha256": "2b7be94ffebbf9fad51f8d8eb520aa1caf0bc272f1d3cb0f6599628c108bb79e",
+      "width": 1280,
+      "height": 560
+    }
+  }
+}

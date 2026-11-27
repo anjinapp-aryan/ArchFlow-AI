@@ -338,3 +338,11 @@ progress {
   justify-content: flex-end;
   min-width: 0;
 }
+
+.zoom {
+  display: inline-flex;
+  gap: 4px;
+}
+.zoom #zoom-fit {
+  min-width: 3.5em;
+}

@@ -189,3 +189,138 @@ describe("fitTitle with a real font measurer", () => {
     expect(plain.document.nodes.some((n) => n.style === undefined)).toBe(true);
   });
 });
+
+describe("connector semantics (canonical minor 2)", () => {
+  const node = (id: string, x: number, y = 0): Record<string, unknown> => ({
+    id,
+    label: id,
+    x,
+    y,
+    w: 100,
+    h: 60,
+  });
+  const doc = (extra: Record<string, unknown>[] = []): Record<string, unknown> => ({
+    schema: "archflow/canonical@1",
+    schemaMinor: 2,
+    diagram: {
+      id: "d",
+      name: "d",
+      nodes: [node("a", 0), node("b", 300), node("c", 300, 200), node("m", 0, 300)],
+      edges: [
+        { id: "plain", from: "a", to: "b" },
+        { id: "sync", from: "a", to: "c", interaction: "sync_request" },
+        { id: "async", from: "b", to: "c", interaction: "async_message" },
+        { id: "mon", from: "m", to: "c", interaction: "monitoring" },
+        { id: "resp", from: "c", to: "a", interaction: "response" },
+      ],
+    },
+    scenario: { id: "s", durationMs: 10000, events: extra },
+  });
+  const adapt = (d: Record<string, unknown>) => {
+    const r = toEngineDocument(d);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    return r.document;
+  };
+
+  it("styles connectors by interaction; edges without one render as before", () => {
+    const e = new Map(adapt(doc()).edges.map((x) => [x.id, x.style]));
+    expect(e.get("plain")).toEqual({
+      strokeStyle: "solid",
+      arrowEnd: "triangle",
+      arrowStart: "none",
+      routing: "curved",
+    });
+    expect(e.get("sync")!.strokeStyle).toBe("solid");
+    expect(e.get("async")!.strokeStyle).toBe("dotted");
+    expect(e.get("mon")).toMatchObject({ strokeStyle: "dashed", arrowEnd: "open" });
+    expect(e.get("mon")!.color).toBeDefined();
+    expect(e.get("resp")).toMatchObject({ strokeStyle: "dashed", arrowEnd: "open" });
+    expect(e.get("resp")!.color).not.toBe(e.get("mon")!.color);
+  });
+
+  it("draws probes as small teal dots without a trail", () => {
+    const d = adapt(
+      doc([
+        { type: "packet", id: "pr", t: 100, durationMs: 500, from: "m", to: "c", variant: "probe" },
+      ]),
+    );
+    expect(d.scenario.steps[0]).toMatchObject({
+      type: "message",
+      variant: "request",
+      packet: "dot",
+      trail: false,
+    });
+  });
+
+  it("animates an asynchronous connector only while its message travels", () => {
+    const d = adapt(
+      doc([
+        { type: "packet", id: "ev", t: 100, durationMs: 500, from: "b", to: "c", variant: "event" },
+        {
+          type: "packet",
+          id: "rq",
+          t: 700,
+          durationMs: 500,
+          from: "a",
+          to: "c",
+          edgeId: "sync",
+          variant: "request",
+        },
+      ]),
+    );
+    const links = d.scenario.steps.filter((s) => s.type === "link");
+    expect(links).toEqual([
+      expect.objectContaining({ edgeId: "async", start: 100, duration: 500, anim: "flow" }),
+    ]);
+  });
+
+  it("turns off-centre axis-aligned end waypoints into document-unique ports", () => {
+    const d = doc();
+    const edges = (d.diagram as { edges: Record<string, unknown>[] }).edges;
+    // a -> b leaves a's right side 15 px below centre; a -> c leaves 15 px above
+    edges[0] = { ...edges[0], routing: "orthogonal", waypoints: [{ x: 200, y: 45 }] };
+    edges[1] = {
+      ...edges[1],
+      routing: "orthogonal",
+      waypoints: [
+        { x: 150, y: 15 },
+        { x: 150, y: 230 },
+      ],
+    };
+    // centred waypoint: no port needed
+    edges[2] = { ...edges[2], routing: "orthogonal", waypoints: [{ x: 350, y: 130 }] };
+    const out = adapt(d);
+    const ids = [
+      ...out.nodes.flatMap((n) => [n.id, ...(n.ports ?? []).map((p) => p.id)]),
+      ...out.edges.map((e) => e.id),
+      ...out.scenario.steps.map((s) => s.id),
+    ];
+    expect(new Set(ids).size).toBe(ids.length);
+    const a = out.nodes.find((n) => n.id === "a")!;
+    expect(a.ports).toEqual([
+      { id: expect.any(String), dx: 104, dy: 45 },
+      { id: expect.any(String), dx: 104, dy: 15 },
+    ]);
+    const e = new Map(out.edges.map((x) => [x.id, x]));
+    expect(e.get("plain")!.fromPort).toBe(a.ports![0]!.id);
+    expect(e.get("sync")!.fromPort).toBe(a.ports![1]!.id);
+    expect(e.get("async")!.fromPort).toBeUndefined();
+    // every referenced port exists on its own node
+    for (const x of out.edges) {
+      if (x.fromPort)
+        expect(out.nodes.find((n) => n.id === x.from)!.ports!.map((p) => p.id)).toContain(
+          x.fromPort,
+        );
+      if (x.toPort)
+        expect(out.nodes.find((n) => n.id === x.to)!.ports!.map((p) => p.id)).toContain(x.toPort);
+    }
+  });
+
+  it("passes label anchors through", () => {
+    const d = doc();
+    const edges = (d.diagram as { edges: Record<string, unknown>[] }).edges;
+    edges[0] = { ...edges[0], label: "x", labelPos: 0.25, labelOffset: -11 };
+    const e = adapt(d).edges[0]!;
+    expect([e.labelPos, e.labelOff]).toEqual([0.25, -11]);
+  });
+});

@@ -13,6 +13,8 @@ The synthesizer turns any canonical diagram into an animation scenario, using de
 | Parallelism | Several async consumers start at the same instant, each in its own flow (`parentFlowId` = publisher's flow) |
 | Ordering | Sync calls run one after another in document order. The publisher continues once its message has left |
 | Failures | Option `failures: [{ from, to, mode: "timeout" \| "error", retries }]`. Attempts fail (timeout badge or red error packet), retries follow (`retry`, `retryOf`, `attempt` n+1), and the last one succeeds. The caller shows `warn` while retrying, then `active` with `recovers` |
+| Health checks | Connectors with `interaction: monitoring` are never request hops, and a monitor-only component is never the entry. Each such connector gets periodic `probe` packets in separate flows ("Health check round n"): 2–4 rounds spread over the animation, independent of request timing. A healthy target answers `success` ("healthy") on the same connector and flashes `success`. A failure injected on a health check (`fail: Checker -> Target timeout`) makes probes time out (a timer on the checker) or error, and the target flashes `down` ("unhealthy"). Status flashes use the target's next free moment, because the model forbids two states at once. Interval text such as "every 30s" stays a label; animation time is not real time and no AWS thresholds are invented. Retries do not apply to probes (`synth.probe_retries_ignored`) |
+| Explicit responses | When a `response` connector is drawn from the callee back to the caller, responses travel on it |
 | End | The entry component turns `success` when its response arrives |
 | Timing | 800 ms per packet, 200 ms gaps, 1.5 s timeouts (all configurable) |
 | Safety | Each path is cycle-free. Traffic is capped at 1,500 packets or 8 minutes (`synth.truncated`). The output always passes the canonical validator, otherwise the run fails |
@@ -25,12 +27,15 @@ Warnings: `synth.unreached` (a component gets no traffic), `synth.no_traffic`, `
 title: Order flow benchmark
 User -> API Gateway : POST /orders           chains; ": label" labels every hop on the line
 API Gateway -> Authentication Service : validate
-Order Service ..> Kafka : OrderCreated        ..> = asynchronous (dashed)
+Order Service ..> Kafka : OrderCreated        ..> = asynchronous (dotted, animated while in use)
 Kafka ..> Consumer 1, Consumer 2 : consume    ","  = fan-out / fan-in
 A <-> B    A -- B    A <- B                   both ways / no arrow / reversed
 entry: User
 fail: Consumer 1 -> PostgreSQL timeout retries 1
+monitor: ALB Health Check -> Order API, Payment API : GET /health every 30s
 ```
+
+`monitor:` (also `health:` or `probe:`) marks health checks. Without it, a connector is still treated as monitoring when its label reads like a health check (health check, /health, liveness, readiness, heartbeat, probe, ping) or its source is a monitoring component (health checker, monitor, watchdog, uptime). That inference is always reported (`text.monitoring_inferred`; `mermaid.monitoring_inferred` in Mermaid flowcharts). Every connector gets an explicit `interaction`.
 
 Sentences work too, one per line or several per paragraph:
 

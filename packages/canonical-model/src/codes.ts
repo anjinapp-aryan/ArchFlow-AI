@@ -25,6 +25,7 @@ export const ERROR_CODES = [
   "packet.edge_mismatch",
   "packet.no_connector",
   "packet.same_endpoints",
+  "packet.traffic_on_monitoring",
   "recover.bad_state",
   "recover.before_failure_end",
   "recover.node_mismatch",
@@ -70,6 +71,7 @@ export const WARNING_CODES = [
   "flow.empty",
   "geometry.node_outside_group",
   "geometry.nodes_overlap",
+  "packet.probe_off_monitoring",
   "state.down_node_used",
   "state.redundant_overlap",
 ] as const;

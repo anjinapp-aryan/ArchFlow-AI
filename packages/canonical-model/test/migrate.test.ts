@@ -22,7 +22,7 @@ const fixture = (): Record<string, unknown> =>
 describe("schema versioning", () => {
   it("constants agree with the schema id", () => {
     expect(CANONICAL_SCHEMA_ID).toBe(`archflow/canonical@${CANONICAL_SCHEMA_MAJOR}`);
-    expect(CANONICAL_SCHEMA_MINOR).toBe(1);
+    expect(CANONICAL_SCHEMA_MINOR).toBe(2);
   });
 
   it.each([

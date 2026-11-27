@@ -3,3 +3,5 @@ export * from "./validate.ts";
 export * from "./migrate.ts";
 export * from "./codes.ts";
 export * from "./text-metrics.ts";
+export * from "./semantics.ts";
+export * from "./connector-geometry.ts";

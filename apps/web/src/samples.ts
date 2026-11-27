@@ -7,6 +7,7 @@ import drawioOrder from "../../../fixtures/diagrams/10-order-flow.drawio";
 import mermaidSyntax from "../../../fixtures/diagrams/14-mermaid-syntax.mmd";
 import pumlComponent from "../../../fixtures/diagrams/16-plantuml-component.puml";
 import pumlSequence from "../../../fixtures/diagrams/17-plantuml-sequence.puml";
+import awsAlb from "../../../fixtures/regression/aws-alb.txt";
 import canonical from "../../../fixtures/scenarios/order-flow.canonical.json";
 import type { SourceKind, UserScenarioOptions } from "./pipeline.ts";
 
@@ -32,6 +33,12 @@ export const SAMPLES: Sample[] = [
     kind: "mermaid",
     text: benchMermaid,
     options: { failure: { from: "Consumer 1", to: "PostgreSQL", mode: "timeout", retries: 1 } },
+  },
+  {
+    id: "aws-alb",
+    title: "AWS load balancer + health checks — text",
+    kind: "text",
+    text: awsAlb,
   },
   { id: "sequence", title: "Checkout — Mermaid sequence diagram", kind: "mermaid", text: sequence },
   {

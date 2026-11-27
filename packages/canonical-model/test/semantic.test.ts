@@ -198,6 +198,8 @@ const NEGATIVE: Record<string, (d: Doc) => void> = {
   "packet.edge_mismatch": (d) => void (ev(d, "q1").edgeId = "bc"),
   "packet.no_connector": (d) => void (ev(d, "q1").to = "c"),
   "packet.same_endpoints": (d) => void (ev(d, "q1").to = "a"),
+  "packet.traffic_on_monitoring": (d) =>
+    void ((d.diagram.edges[0] as Rec).interaction = "monitoring"),
   "recover.bad_state": (d) => void (ev(d, "st2").state = "busy"),
   "recover.before_failure_end": (d) => void (ev(d, "st2").t = 3500),
   "recover.node_mismatch": (d) => void (ev(d, "st2").nodeId = "b"),
@@ -285,6 +287,28 @@ describe("semantic validation: negative (one test per error code)", () => {
   });
 });
 
+describe("connector semantics (minor 2)", () => {
+  it("probes along a monitoring connector are valid, even to a down target", () => {
+    const d = base();
+    (d.diagram.edges[2] as Rec).interaction = "monitoring";
+    add(d, {
+      type: "node_state",
+      id: "unhealthy",
+      t: 6000,
+      durationMs: 2000,
+      nodeId: "d",
+      state: "down",
+      label: "unhealthy",
+    });
+    add(d, packet("p1", "b", "d", "probe", 6500));
+    const r = validateCanonical(d);
+    expect(r.errors).toEqual([]);
+    // the baseline already warns for c; the probe to the unhealthy d must not add a warning
+    expect(r.warnings.filter((w) => w.message.includes('"d" is down'))).toEqual([]);
+    expect(r.warnings.map((w) => w.code)).not.toContain("packet.probe_off_monitoring");
+  });
+});
+
 describe("semantic validation: warnings never block", () => {
   const warns: Record<string, (d: Doc) => void> = {
     "event.unsorted": (d) => void d.scenario.events.reverse(),
@@ -294,6 +318,7 @@ describe("semantic validation: warnings never block", () => {
       d.diagram.nodes[1]!.groupId = "g";
     },
     "geometry.nodes_overlap": (d) => void (d.diagram.nodes[1]!.x = 50),
+    "packet.probe_off_monitoring": (d) => add(d, packet("p9", "b", "d", "probe", 6000)),
     "state.down_node_used": () => undefined, // already present in the baseline: e1 -> c while c is down
     "state.redundant_overlap": (d) =>
       add(d, {

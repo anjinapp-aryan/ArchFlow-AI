@@ -93,6 +93,28 @@ export interface Framing {
   /** World rectangle to fit: x, y, width, height (engine `bounds`). */
   bounds: [number, number, number, number];
   background: string;
+  /**
+   * Port markers to leave out (keys from `portMarkerKeys`). The engine always draws a 4 px ring
+   * at every node port; ArchFlow uses ports only to anchor routed connectors, so they stay hidden.
+   */
+  hiddenMarkers?: ReadonlySet<string>;
+}
+
+const markerKey = (x: number, y: number): string => `${Math.round(x * 4)},${Math.round(y * 4)}`;
+
+/** Positions of every node port in an engine document (diagram coordinates). */
+export function portMarkerKeys(engineJson: string): Set<string> {
+  const out = new Set<string>();
+  try {
+    const doc = JSON.parse(engineJson) as {
+      nodes?: { x: number; y: number; ports?: { dx: number; dy: number }[] }[];
+    };
+    for (const n of doc.nodes ?? [])
+      for (const p of n.ports ?? []) out.add(markerKey(n.x + p.dx, n.y + p.dy));
+  } catch {
+    // not JSON: nothing to hide
+  }
+  return out;
 }
 
 const colorCache = new Map<number, string>();
@@ -132,10 +154,16 @@ export function paintFrame(
     (cw - bounds[2] * k) / 2 - bounds[0] * k,
     (ch - bounds[3] * k) / 2 - bounds[1] * k,
   );
-  if (list.data.length > 0) drawItems(ctx, list, k, text);
+  if (list.data.length > 0) drawItems(ctx, list, k, text, framing.hiddenMarkers);
 }
 
-function drawItems(ctx: Ctx2D, list: DisplayList, deviceScale: number, text: BrowserText): void {
+function drawItems(
+  ctx: Ctx2D,
+  list: DisplayList,
+  deviceScale: number,
+  text: BrowserText,
+  hidden?: ReadonlySet<string>,
+): void {
   const data = list.data;
   const strings = list.strings;
   let pos = 0;
@@ -334,6 +362,17 @@ function drawItems(ctx: Ctx2D, list: DisplayList, deviceScale: number, text: Bro
         paintPath(p, effect, fill, stroke);
         break;
       case 2:
+        // engine port marker (radius 4, not selected): hidden when it sits on a known port
+        if (
+          hidden !== undefined &&
+          hidden.size > 0 &&
+          data[pos + 2] === 4 &&
+          data[pos + 3] === 4 &&
+          hidden.has(markerKey(data[pos]!, data[pos + 1]!))
+        ) {
+          pos += 4;
+          break;
+        }
         p = new Path2D();
         p.ellipse(
           data[pos]!,

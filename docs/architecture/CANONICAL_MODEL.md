@@ -36,6 +36,19 @@ An edge has endpoints (`from`,`to` node ids), an optional `waypoints` polyline (
 
 - `direction`: `forward` (arrowhead at `to`), `backward` (at `from`), `both`, `none`.
 - `arrowHead`: shape used on every end that has one (`triangle|open|diamond|circle|none`).
+- `interaction` (minor 2, optional): what the connector means.
+  - `sync_request`: the caller waits for an answer.
+  - `async_message`: fire and forget.
+  - `monitoring`: a periodic probe such as a health check; it is never a request-routing hop.
+  - `response`: an explicitly drawn return path.
+  - When absent, `edgeInteraction()` infers it as before minor 2: a solid line is synchronous, a dashed or dotted line is asynchronous.
+- `labelPos` (0..1) and `labelOffset` (-200..200), minor 2, optional: where the label sits, as a fraction of the drawn path length and a perpendicular offset. A positive offset is above a horizontal segment, left of a downward segment and right of an upward one, exactly as the engine reads it. Auto-layout sets them so labels avoid nodes and other labels.
+- An `orthogonal` connector whose first or last waypoint is axis-aligned with a side of its node leaves or enters that side at exactly that coordinate. The adapter turns this into an engine node port.
+
+Packet variant `probe` (minor 2) is a monitoring probe; it travels only along `monitoring` connectors.
+- `packet.traffic_on_monitoring` (error): a request, retry or event uses a monitoring connector.
+- `packet.probe_off_monitoring` (warning): a probe uses another kind of connector.
+- Probing a `down` target is normal, so it does not raise `state.down_node_used`.
 
 Component relationships are the edges plus `groups` (hierarchy via `parentId`, membership via `node.groupId`). The adapter currently **rejects groups** (`unsupported.groups`) because the engine cannot draw them; the model keeps them so importers do not lose information.
 
@@ -132,6 +145,7 @@ Result type: `{ ok, value?, errors[], warnings[] }`; each issue `{ code, path (J
 | ----- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | 0     | 2026-11-26 | P1.2 baseline                                                                                                                |
 | 1     | 2026-11-26 | optional `group.frame` (absolute rectangle, kept by importers); new warning `geometry.node_outside_group`. Minor-0 documents stay valid unchanged. |
+| 2     | 2026-11-27 | optional `edge.interaction`, `edge.labelPos`, `edge.labelOffset`; packet variant `probe`; error `packet.traffic_on_monitoring`, warning `packet.probe_off_monitoring`. Older documents stay valid and render unchanged. |
 
 ## 6. Known gaps (deliberate)
 

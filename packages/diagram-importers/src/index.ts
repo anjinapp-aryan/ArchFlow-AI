@@ -4,7 +4,15 @@ export { parseXml, type XmlElement } from "./xml.ts";
 export { importMermaid } from "./mermaid.ts";
 export { importPlantUml } from "./plantuml.ts";
 export { MESSAGE_MS, MESSAGE_GAP_MS } from "./mermaid-sequence.ts";
-export { layoutGraph, nodeWidth, type RankDir } from "./layout.ts";
+export {
+  applyRoutes,
+  edgeLabelWidth,
+  layoutGraph,
+  nodeWidth,
+  type EdgeRoute,
+  type LayoutResult,
+  type RankDir,
+} from "./layout.ts";
 
 import { importDrawio } from "./drawio.ts";
 import { importMermaid } from "./mermaid.ts";

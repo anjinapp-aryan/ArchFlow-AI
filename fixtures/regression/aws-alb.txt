@@ -1,0 +1,11 @@
+title: AWS Application Load Balancer routing
+Client -> ALB Listener 443 : HTTPS request
+ALB Listener 443 -> Rule Engine : evaluate rules by priority
+Rule Engine -> Auth TG : /auth* or host auth.app
+Rule Engine -> API TG : /api/* path match
+Rule Engine -> Web TG : default rule fallback
+Auth TG -> Auth Service : forward healthy target
+API TG -> Order API, Payment API : round-robin healthy targets
+Web TG -> Frontend ECS : forward healthy target
+ALB Health Check -> Order API, Payment API, Frontend ECS : GET /health every 30s
+fail: ALB Health Check -> Order API timeout retries 1

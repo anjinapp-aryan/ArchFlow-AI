@@ -25,7 +25,7 @@ const $ = <T extends HTMLElement>(id: string): T => {
 };
 
 const HINTS: Record<SourceKind, string> = {
-  text: "One link per line: “User -> API Gateway -> Orders : POST /orders”. Use “,” for fan-out, “..>” for async, “fail: A -> B timeout retries 1”. Plain sentences work too.",
+  text: "One link per line: “User -> API Gateway -> Orders : POST /orders”. Use “,” for fan-out, “..>” for async, “fail: A -> B timeout retries 1”, “monitor: LB -> Service : GET /health” for health checks. Plain sentences work too.",
   mermaid: "Paste a Mermaid flowchart (graph/flowchart) or sequenceDiagram.",
   drawio: "Paste draw.io XML or open a .drawio file (compressed files are fine).",
   plantuml: "Paste a PlantUML component/deployment or sequence diagram (@startuml … @enduml).",
@@ -50,6 +50,9 @@ const ui = {
   issues: $<HTMLUListElement>("issues"),
   issueCount: $<HTMLSpanElement>("issue-count"),
   canvas: $<HTMLCanvasElement>("canvas"),
+  zoomIn: $<HTMLButtonElement>("zoom-in"),
+  zoomOut: $<HTMLButtonElement>("zoom-out"),
+  zoomFit: $<HTMLButtonElement>("zoom-fit"),
   placeholder: $<HTMLParagraphElement>("placeholder"),
   prev: $<HTMLButtonElement>("prev"),
   back: $<HTMLButtonElement>("back"),
@@ -154,6 +157,7 @@ async function run(options: UserScenarioOptions | undefined, keepControls: boole
       return;
     }
     const loaded = player.load(r.engineJson);
+    updateZoom();
     if (!loaded.ok) {
       showIssues([...r.issues, { level: "error", code: "engine.load", message: loaded.error }]);
       return;
@@ -178,6 +182,12 @@ function updateTransport(): void {
   ui.time.textContent = `${(t / 1000).toFixed(1)} / ${(player.durationMs / 1000).toFixed(1)} s`;
   ui.play.textContent = player.isPlaying ? "⏸" : "▶";
   ui.play.setAttribute("aria-label", player.isPlaying ? "Pause" : "Play");
+}
+
+function updateZoom(): void {
+  const z = player?.zoomLevel ?? 1;
+  ui.zoomFit.textContent = z > 1.001 ? `${Math.round(z * 100)}%` : "Fit";
+  ui.zoomOut.disabled = z <= 1.001;
 }
 
 function jumpEvent(dir: 1 | -1): void {
@@ -229,6 +239,7 @@ async function doExport(): Promise<void> {
       blob = await exportVideo({
         engine: player.engine,
         text: player.text,
+        hiddenMarkers: player.hiddenMarkers,
         format,
         width: w,
         height: h,
@@ -345,7 +356,60 @@ function wire(): void {
   });
   ui.speed.addEventListener("change", () => player && (player.speed = Number(ui.speed.value)));
   ui.loop.addEventListener("change", () => player && (player.loop = ui.loop.checked));
-  ui.canvas.addEventListener("click", () => player?.toggle());
+  // zoom (wheel, buttons, + - 0 keys) and pan (drag) for large diagrams; a click still plays/pauses
+  let drag: { x: number; y: number; moved: boolean } | undefined;
+  let suppressClick = false;
+  ui.canvas.addEventListener(
+    "wheel",
+    (e) => {
+      if (!player?.engine.loaded) return;
+      e.preventDefault();
+      player.zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.offsetX, e.offsetY);
+      updateZoom();
+    },
+    { passive: false },
+  );
+  ui.canvas.addEventListener("pointerdown", (e) => {
+    drag = { x: e.clientX, y: e.clientY, moved: false };
+    ui.canvas.setPointerCapture(e.pointerId);
+  });
+  ui.canvas.addEventListener("pointermove", (e) => {
+    if (!drag || !player || player.zoomLevel <= 1) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+    player.panBy(dx, dy);
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+  });
+  ui.canvas.addEventListener("pointerup", () => {
+    suppressClick = drag?.moved ?? false;
+    drag = undefined;
+  });
+  ui.canvas.addEventListener("dblclick", () => {
+    player?.resetView();
+    updateZoom();
+  });
+  ui.zoomIn.addEventListener("click", () => {
+    player?.zoomBy(1.4);
+    updateZoom();
+  });
+  ui.zoomOut.addEventListener("click", () => {
+    player?.zoomBy(1 / 1.4);
+    updateZoom();
+  });
+  ui.zoomFit.addEventListener("click", () => {
+    player?.resetView();
+    updateZoom();
+  });
+  ui.canvas.addEventListener("click", () => {
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    player?.toggle();
+  });
   document.addEventListener("keydown", (e) => {
     const target = e.target as HTMLElement;
     if (!player || target.closest("textarea, input, select") || e.ctrlKey || e.metaKey || e.altKey)
@@ -354,6 +418,19 @@ function wire(): void {
     switch (e.key) {
       case " ":
         player.toggle();
+        break;
+      case "+":
+      case "=":
+        player.zoomBy(1.4);
+        updateZoom();
+        break;
+      case "-":
+        player.zoomBy(1 / 1.4);
+        updateZoom();
+        break;
+      case "0":
+        player.resetView();
+        updateZoom();
         break;
       case "ArrowRight":
         if (e.shiftKey) jumpEvent(1);

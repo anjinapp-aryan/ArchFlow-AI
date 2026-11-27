@@ -15,6 +15,12 @@ export const GOLDEN_CASES = [
     file: "order-flow.canonical.json",
     times: [0, 700, 1700, 2500, 3400, 4400, 5400, 6500, 7900, 8800, 9900, 10900, 12000, 16000],
   },
+  {
+    // regression fixture: orthogonal routing, connector semantics, health-check probes
+    id: "aws-alb",
+    file: "aws-alb.canonical.json",
+    times: [0, 900, 1500, 2100, 2700, 6500, 7400, 8100, 12300, 13500, 17500],
+  },
 ] as const;
 
 export interface DisplayListGolden {

@@ -1,0 +1,62 @@
+{
+  "schema": "archflow/golden-displaylist@1",
+  "metrics": "deterministic-v1",
+  "fixture": "aws-alb",
+  "frames": {
+    "0": {
+      "sha256": "0dd19bf3c089f0119aeb3eacfcfd14079689c62a4f80661985d8b7dadff560a3",
+      "doubles": 2353,
+      "stringBytes": 472
+    },
+    "900": {
+      "sha256": "e77bb9d92530f1894c1569da3fd90566cfe4829f3b65b9ecc72058ec1e083fdb",
+      "doubles": 2577,
+      "stringBytes": 496
+    },
+    "1500": {
+      "sha256": "d9ee017a13704e8c26ceea0eef41a2cf821128a64582d35330659e2a5aceb06a",
+      "doubles": 2657,
+      "stringBytes": 518
+    },
+    "2100": {
+      "sha256": "066ee5790eb1bd56b267a1908ac9456c2ced719a5ed8b6b7a94a50e0984607bd",
+      "doubles": 2561,
+      "stringBytes": 507
+    },
+    "2700": {
+      "sha256": "43ce5c197d3183ff1efdd13b491c88e7414e5f4a0f8834e820629e54533d8d3e",
+      "doubles": 2586,
+      "stringBytes": 520
+    },
+    "6500": {
+      "sha256": "74dd27805f7afb0b4257f6796e6277a6d73f16bb71fce4ccc452f5e286b04410",
+      "doubles": 2722,
+      "stringBytes": 527
+    },
+    "7400": {
+      "sha256": "5c07a1a6759e81110762d1e142c6ac9335b3ee69f8da7bd8b3e71c4d167a7597",
+      "doubles": 2547,
+      "stringBytes": 485
+    },
+    "8100": {
+      "sha256": "a8f9f75bef13140bfe781d896972b460563879811a732d59b7de58780741a9fb",
+      "doubles": 2444,
+      "stringBytes": 474
+    },
+    "12300": {
+      "sha256": "a47661f2974b9ebf3963a741432f9cb56ce85d1e7d113b3eb514f2f6f19a6d81",
+      "doubles": 2699,
+      "stringBytes": 526
+    },
+    "13500": {
+      "sha256": "ddaf0ba150c80ab71949a92ecdfe3648e36eb95847d74e486eb93791471cea2d",
+      "doubles": 2527,
+      "stringBytes": 478
+    },
+    "17500": {
+      "sha256": "865a007b5368958ce097ed271d96fd99309c0cb36e91e226db808c2c500e61eb",
+      "doubles": 2353,
+      "stringBytes": 473
+    }
+  }
+}

@@ -182,4 +182,33 @@ describe("web app (production build)", () => {
     );
     expect(readFileSync(f).subarray(4, 8).toString("ascii")).toBe("ftyp");
   }, 120_000);
+
+  it("zooms and pans large diagrams, and fits again", async () => {
+    await page.select("#examples", "aws-alb");
+    await page.waitForFunction(
+      () => !(document.querySelector("#animate") as HTMLButtonElement).disabled,
+    );
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+    const fit = await page.$eval("#canvas", (c) => (c as HTMLCanvasElement).toDataURL());
+    await page.click("#zoom-in");
+    expect(await page.$eval("#zoom-fit", (b) => b.textContent?.trim())).toBe("140%");
+    // the zoomed view is painted on the next animation frame
+    await page.waitForFunction(
+      (before) => (document.querySelector("#canvas") as HTMLCanvasElement).toDataURL() !== before,
+      { timeout: 5000 },
+      fit,
+    );
+    // drag pans without toggling playback
+    const playing = await page.$eval("#play", (b) => b.getAttribute("aria-label"));
+    const box = (await page.$("#canvas"))!.boundingBox();
+    const b = (await box)!;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2 - 120, b.y + b.height / 2 - 40, { steps: 6 });
+    await page.mouse.up();
+    expect(await page.$eval("#play", (x) => x.getAttribute("aria-label"))).toBe(playing);
+    await page.click("#zoom-fit");
+    expect(await page.$eval("#zoom-fit", (x) => x.textContent?.trim())).toBe("Fit");
+    expect(await page.$eval("#zoom-out", (x) => (x as HTMLButtonElement).disabled)).toBe(true);
+  });
 });

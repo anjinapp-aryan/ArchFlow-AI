@@ -21,7 +21,8 @@ afterAll(async () => {
 });
 
 describe("painter parity with the upstream player", () => {
-  it.each(["order-flow", "linear-3"])(
+  // aws-alb covers ports, orthogonal waypoints, label anchors, probes and edge animations
+  it.each(["order-flow", "linear-3", "aws-alb"])(
     "%s: identical pixels at several instants",
     async (name) => {
       const art = loadArtifacts(repoRoot);
@@ -60,6 +61,7 @@ describe("painter parity with the upstream player", () => {
               framing: unknown,
               text: unknown,
             ): void;
+            portMarkerKeys(json: string): Set<string>;
           };
           const g = globalThis as unknown as { AdPlayerEngine: unknown; ArchFlowEngineHost: Host };
           const H = g.ArchFlowEngineHost;
@@ -69,6 +71,7 @@ describe("painter parity with the upstream player", () => {
           const up = document.querySelector("canvas.ad-canvas") as HTMLCanvasElement;
           const mine = document.createElement("canvas");
           const out: number[] = [];
+          const hidden = H.portMarkerKeys(docJson);
           for (const t of ts) {
             window.postMessage({ type: "ad-player", action: "seek", time: t }, "*");
             await new Promise<void>((r) =>
@@ -93,6 +96,37 @@ describe("painter parity with the upstream player", () => {
             let d = 0;
             for (let i = 0; i < a1.length; i++) if (a1[i] !== a2[i]) d++;
             out.push(d);
+            if (hidden.size > 0) {
+              // with port markers hidden, pixels may differ only right around the ports
+              const [bx, by, bw, bh] = host.loaded.bounds;
+              const k = Math.min(up.width / bw, up.height / bh);
+              const ox = (up.width - bw * k) / 2 - bx * k;
+              const oy = (up.height - bh * k) / 2 - by * k;
+              H.paintFrame(
+                ctx,
+                host.frame(t),
+                {
+                  width: up.width,
+                  height: up.height,
+                  bounds: host.loaded.bounds,
+                  background: host.loaded.background || "#0a111f",
+                  hiddenMarkers: hidden,
+                },
+                text,
+              );
+              const a3 = ctx.getImageData(0, 0, up.width, up.height).data;
+              const ports = [...hidden].map((key) => key.split(",").map((v) => Number(v) / 4));
+              let changed = 0;
+              let outside = 0;
+              for (let i = 0; i < a1.length; i += 4) {
+                if (a1[i] === a3[i] && a1[i + 1] === a3[i + 1] && a1[i + 2] === a3[i + 2]) continue;
+                changed++;
+                const px = (((i / 4) % up.width) - ox) / k;
+                const py = (Math.floor(i / 4 / up.width) - oy) / k;
+                if (!ports.some(([x, y]) => Math.hypot(px - x!, py - y!) <= 8)) outside++;
+              }
+              out.push(changed > 0 ? 0 : -1, outside);
+            }
           }
           return out;
         },
@@ -100,7 +134,8 @@ describe("painter parity with the upstream player", () => {
         times,
       );
       await page.close();
-      expect(diffs).toEqual(times.map(() => 0));
+      // every entry is 0: identical pixels, and (with ports) hidden markers changed pixels only at ports
+      expect(diffs.every((d) => d === 0)).toBe(true);
     },
     120_000,
   );

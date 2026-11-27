@@ -6,6 +6,7 @@ import type {
   PacketEvent,
   TimeoutEvent,
 } from "./schema.ts";
+import { edgeInteraction } from "./schema.ts";
 
 export interface Issue {
   code: string;
@@ -33,7 +34,9 @@ export interface Ctx {
 const end = (e: CanonicalEvent): number => e.t + e.durationMs;
 const FAILURE_STATES = new Set(["down", "warn", "disabled"]);
 const RECOVERY_STATES = new Set(["ok", "active", "success"]);
-const FORWARD_VARIANTS = new Set(["request", "retry", "event"]);
+const FORWARD_VARIANTS = new Set(["request", "retry", "event", "probe"]);
+/** Application traffic: must never travel along a monitoring connector. */
+const TRAFFIC_VARIANTS = new Set(["request", "retry", "event"]);
 
 interface Indexed<T> {
   ev: T;
@@ -316,6 +319,23 @@ export function runRules(ctx: Ctx): void {
       else edge = matches[0];
     }
 
+    // connector semantics (minor 2): probes and application traffic use separate connectors
+    if (edge) {
+      const kind = edgeInteraction(edge);
+      if (kind === "monitoring" && TRAFFIC_VARIANTS.has(ev.variant))
+        ctx.error(
+          "packet.traffic_on_monitoring",
+          base,
+          `${ev.variant} packet uses monitoring connector "${edge.id}"; health checks are not a routing hop`,
+        );
+      if (ev.variant === "probe" && kind !== "monitoring")
+        ctx.warn(
+          "packet.probe_off_monitoring",
+          base,
+          `probe travels along "${edge.id}", which is not a monitoring connector`,
+        );
+    }
+
     // direction vs arrowhead
     if (edge && FORWARD_VARIANTS.has(ev.variant) && ctx.opts.directionPolicy !== "off") {
       const follows =
@@ -343,7 +363,8 @@ export function runRules(ctx: Ctx): void {
               base,
               `${role} "${nodeId}" is disabled during this packet (state "${s.ev.id}")`,
             );
-          else if (s.ev.state === "down")
+          // probing an unhealthy target is exactly what health checks do
+          else if (s.ev.state === "down" && ev.variant !== "probe")
             ctx.warn(
               "state.down_node_used",
               base,

@@ -17,6 +17,7 @@ export interface ExportRequest {
   width: number;
   height: number;
   fps: number;
+  hiddenMarkers?: ReadonlySet<string>;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
 }
@@ -107,7 +108,13 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
 
   const frameUs = 1_000_000 / fps;
   const total = Math.max(1, Math.ceil((info.durationMs / 1000) * fps) + 1);
-  const framing = { width, height, bounds: info.bounds, background: info.background || "#0a111f" };
+  const framing = {
+    width,
+    height,
+    bounds: info.bounds,
+    background: info.background || "#0a111f",
+    ...(req.hiddenMarkers ? { hiddenMarkers: req.hiddenMarkers } : {}),
+  };
   try {
     for (let i = 0; i < total; i++) {
       if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");

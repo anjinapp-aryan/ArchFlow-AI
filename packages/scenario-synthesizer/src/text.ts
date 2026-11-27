@@ -2,12 +2,13 @@ import {
   CANONICAL_SCHEMA_ID,
   CANONICAL_SCHEMA_MINOR,
   LIMITS,
+  looksLikeMonitoring,
   validateCanonical,
   type CanonicalDocument,
   type CanonicalEdge,
   type CanonicalNode,
 } from "@archflow/canonical-model";
-import { IdMapper, layoutGraph } from "@archflow/diagram-importers";
+import { IdMapper, applyRoutes, layoutGraph } from "@archflow/diagram-importers";
 import type { FailureSpec, SynthesisIssue, SynthesisOptions } from "./synthesize.ts";
 
 /**
@@ -20,6 +21,10 @@ import type { FailureSpec, SynthesisIssue, SynthesisOptions } from "./synthesize
  *   The API Gateway forwards the request to the Order Service.   (verb sentences)
  *   Consumer 1 consumes from Kafka.                              (consume = reverse, async)
  *   title: ...   entry: User   fail: Consumer 2 -> PostgreSQL timeout retries 2
+ *   monitor: ALB Health Check -> Order API, Payment API : GET /health every 30s
+ *       (health checks / probes: periodic monitoring, never part of request routing; connectors
+ *        labelled like a health check, or starting at a "health check"/"monitor" component, are
+ *        treated the same way and reported)
  *   Consumer 2 fails calling PostgreSQL and retries twice.
  * Anything not understood is reported as a warning, never guessed.
  */
@@ -131,7 +136,9 @@ export function parseDescription(text: string): DescriptionResult {
     label?: string;
     direction: CanonicalEdge["direction"];
     stroke: CanonicalEdge["stroke"];
+    monitoring?: true;
   }[] = [];
+  let monitoringStatement = false;
   const edge = (
     a: string,
     b: string,
@@ -154,6 +161,7 @@ export function parseDescription(text: string): DescriptionResult {
       ...(label ? { label: label.slice(0, LIMITS.maxLabelLength) } : {}),
       direction,
       stroke,
+      ...(monitoringStatement ? { monitoring: true as const } : {}),
     });
   };
 
@@ -165,8 +173,14 @@ export function parseDescription(text: string): DescriptionResult {
     .map((s) => s.trim().replace(/^[-*•\d.)\s]+(?=[A-Za-z])/, ""))
     .filter((s) => s && !s.startsWith("#") && !s.startsWith("//"));
 
-  for (const st of statements) {
+  for (const statement of statements) {
     let m: RegExpExecArray | null;
+    let st = statement;
+    monitoringStatement = false;
+    if ((m = /^(?:monitor(?:ing)?|health(?:s*-?s*checks?)?|probes?)s*:s*(.+)$/i.exec(st))) {
+      monitoringStatement = true;
+      st = m[1]!;
+    }
     if ((m = /^title\s*:\s*(.+)$/i.exec(st))) {
       title = clean(m[1]!) || title;
       continue;
@@ -291,23 +305,50 @@ export function parseDescription(text: string): DescriptionResult {
     w: 120,
     h: 60,
   }));
-  const edges: CanonicalEdge[] = rawEdges.map((e, i) => ({
-    id: `e${i + 1}`,
-    from: idOf.get(e.from)!,
-    to: idOf.get(e.to)!,
-    ...(e.label ? { label: e.label } : {}),
-    direction: e.direction,
-    arrowHead: e.direction === "none" ? "none" : "triangle",
-    stroke: e.stroke,
-    routing: "curved",
-  }));
+  const inferred: string[] = [];
+  const edges: CanonicalEdge[] = rawEdges.map((e, i) => {
+    let interaction: CanonicalEdge["interaction"] = e.monitoring
+      ? "monitoring"
+      : e.stroke === "solid"
+        ? "sync_request"
+        : "async_message";
+    if (!e.monitoring && looksLikeMonitoring(e.label, { label: labels.get(e.from)! })) {
+      interaction = "monitoring";
+      inferred.push(`${labels.get(e.from)} -> ${labels.get(e.to)}`);
+    }
+    return {
+      id: `e${i + 1}`,
+      from: idOf.get(e.from)!,
+      to: idOf.get(e.to)!,
+      ...(e.label ? { label: e.label } : {}),
+      direction: e.direction,
+      arrowHead: e.direction === "none" ? "none" : "triangle",
+      stroke: interaction === "monitoring" ? "dashed" : e.stroke,
+      routing: "curved",
+      interaction,
+    };
+  });
+  if (inferred.length)
+    warnings.push({
+      code: "text.monitoring_inferred",
+      message: `treated as health checks (monitoring, not request routing): ${inferred.slice(0, 5).join("; ")}${inferred.length > 5 ? "; …" : ""}. Write "monitor: A -> B" to say so explicitly.`,
+    });
   const placed = layoutGraph(
     nodes.map((n) => ({ id: n.id, label: n.label, kind: n.kind })),
     [],
-    edges.map((e) => ({ from: e.from, to: e.to, ...(e.label ? { label: e.label } : {}) })),
+    edges.map((e) => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      ...(e.label ? { label: e.label } : {}),
+      ...(e.interaction ? { interaction: e.interaction } : {}),
+      arrowStart: e.direction === "backward" || e.direction === "both",
+      arrowEnd: e.direction === "forward" || e.direction === "both",
+    })),
     "LR",
   );
   for (const n of nodes) Object.assign(n, placed.nodes.get(n.id)!);
+  applyRoutes(edges, placed.edges);
   if (failures.length) options.failures = failures;
 
   const doc: CanonicalDocument = {

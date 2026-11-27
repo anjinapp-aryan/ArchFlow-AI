@@ -14,7 +14,7 @@ export const CANONICAL_SCHEMA_ID = "archflow/canonical@1" as const;
 /** Major version (breaking changes). Encoded in the `schema` string. */
 export const CANONICAL_SCHEMA_MAJOR = 1;
 /** Minor version (additive, backwards-compatible changes). Encoded in `schemaMinor`. */
-export const CANONICAL_SCHEMA_MINOR = 1;
+export const CANONICAL_SCHEMA_MINOR = 2;
 
 /** Hard limits: protect the engine and the browser from oversized/hostile input. */
 export const LIMITS = {
@@ -62,10 +62,20 @@ export const PACKET_VARIANTS = [
   "error",
   "success",
   "event",
+  /** Health-check / monitoring probe (minor 2). Travels only along `monitoring` connectors. */
+  "probe",
 ] as const;
 export const ARROW_HEADS = ["triangle", "open", "diamond", "circle", "none"] as const;
 export const STROKES = ["solid", "dashed", "dotted"] as const;
 export const ROUTINGS = ["curved", "straight", "orthogonal"] as const;
+/**
+ * What a connector means (minor 2). Absent = inferred (see `edgeInteraction`):
+ * - `sync_request`: caller waits for an answer (request/response).
+ * - `async_message`: fire-and-forget message or event; nobody waits.
+ * - `monitoring`: periodic probe (health check, heartbeat); never part of request routing.
+ * - `response`: an explicit return path drawn as its own connector.
+ */
+export const INTERACTIONS = ["sync_request", "async_message", "monitoring", "response"] as const;
 export const PACKET_SHAPES = ["capsule", "dot", "square", "diamond", "envelope", "arrow"] as const;
 
 export const PointSchema = z.strictObject({ x: coord, y: coord });
@@ -95,6 +105,11 @@ export const EdgeSchema = z.strictObject({
   /** Curvature offset (engine units); only meaningful for `curved`. */
   curve: z.optional(finite.check(z.gte(-1), z.lte(1))),
   waypoints: z.optional(z.array(PointSchema).check(z.maxLength(LIMITS.maxWaypoints))),
+  /** Connector semantics (minor 2). */
+  interaction: z.optional(z.enum(INTERACTIONS)),
+  /** Label anchor: fraction along the drawn path (0..1) and perpendicular offset (minor 2). */
+  labelPos: z.optional(finite.check(z.gte(0), z.lte(1))),
+  labelOffset: z.optional(finite.check(z.gte(-200), z.lte(200))),
 });
 
 /** Absolute rectangle (diagram pixels). Added in minor 1. */
@@ -217,6 +232,16 @@ export const CanonicalDocumentSchema = z.strictObject({
 export type Point = z.infer<typeof PointSchema>;
 export type CanonicalNode = z.infer<typeof NodeSchema>;
 export type CanonicalEdge = z.infer<typeof EdgeSchema>;
+export type Interaction = (typeof INTERACTIONS)[number];
+
+/**
+ * Effective connector semantics: the explicit `interaction`, else dashed/dotted = asynchronous
+ * (the behaviour before minor 2), else synchronous request.
+ */
+export function edgeInteraction(e: Pick<CanonicalEdge, "interaction" | "stroke">): Interaction {
+  if (e.interaction !== undefined) return e.interaction;
+  return e.stroke === "solid" ? "sync_request" : "async_message";
+}
 export type Frame = z.infer<typeof FrameSchema>;
 export type CanonicalGroup = z.infer<typeof GroupSchema>;
 export type CanonicalDiagram = z.infer<typeof DiagramSchema>;

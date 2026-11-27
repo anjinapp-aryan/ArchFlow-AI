@@ -1,5 +1,6 @@
 import {
   TITLE_FONT_PX,
+  sidePort,
   titleRoom,
   titleWidth,
   validateCanonical,
@@ -12,7 +13,9 @@ import {
   type EngineDocument,
   type EngineEdge,
   type EngineStep,
+  type EngineNode,
 } from "./engine-document.ts";
+import { CONNECTOR_COLORS, PROBE_PACKET, connectorStyle } from "./connector-style.ts";
 
 export interface AdaptError {
   /** `validation.*` (input invalid) or `unsupported.*` (valid input the engine cannot represent). */
@@ -99,7 +102,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     });
   if (errors.length > 0 || !scenario) return { ok: false, errors };
 
-  const nodes = diagram.nodes.map((n) => ({
+  const nodes: EngineNode[] = diagram.nodes.map((n) => ({
     id: n.id,
     label: n.label,
     kind: n.kind,
@@ -111,25 +114,68 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     ...fitTitle(n.label, n.kind, n.w, options.measureTitle),
   }));
 
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const usedIds = new Set<string>([
+    ...diagram.nodes.map((n) => n.id),
+    ...diagram.edges.map((e) => e.id),
+    ...scenario.events.flatMap((ev) => [ev.id, `${ev.id}~link`]),
+  ]);
+  /**
+   * An orthogonal connector whose first/last waypoint is axis-aligned with a side of its node,
+   * off that side's centre line, leaves/enters exactly there: the engine gets a node port. (On
+   * the centre line the engine already computes that same point, so no port is added.)
+   */
+  const portFor = (nodeId: string, p: { x: number; y: number }): string | undefined => {
+    const n = nodeById.get(nodeId)!;
+    const at = sidePort(n, p);
+    if (!at) return undefined;
+    const onCenter =
+      Math.abs(at.y - (n.y + n.h / 2)) < 0.5 || Math.abs(at.x - (n.x + n.w / 2)) < 0.5;
+    if (onCenter) return undefined;
+    n.ports ??= [];
+    const dx = Math.round((at.x - n.x) * 100) / 100;
+    const dy = Math.round((at.y - n.y) * 100) / 100;
+    const existing = n.ports.find((q) => q.dx === dx && q.dy === dy);
+    if (existing) return existing.id;
+    // the engine makes ids unique across the whole document (nodes, ports, edges, steps) and
+    // renames clashes, which would silently detach the edge: use document-unique port ids
+    let id = `port:${n.id}:${n.ports.length + 1}`;
+    while (usedIds.has(id)) id += "'";
+    usedIds.add(id);
+    n.ports.push({ id, dx, dy });
+    return id;
+  };
   const edges: EngineEdge[] = diagram.edges.map((e) => {
     const none = "none";
     const startHead = e.direction === "backward" || e.direction === "both" ? e.arrowHead : none;
     const endHead = e.direction === "forward" || e.direction === "both" ? e.arrowHead : none;
+    const wps = e.waypoints ?? [];
+    const ortho = e.routing === "orthogonal" && wps.length > 0;
+    const fromPort = ortho ? portFor(e.from, wps[0]!) : undefined;
+    const toPort = ortho ? portFor(e.to, wps[wps.length - 1]!) : undefined;
+    const base = {
+      strokeStyle: e.stroke,
+      arrowEnd: endHead,
+      arrowStart: startHead,
+      routing: e.routing,
+    };
     return {
       id: e.id,
       from: e.from,
       to: e.to,
       ...(e.label !== undefined ? { label: e.label } : {}),
       ...(e.curve !== undefined ? { curve: e.curve } : {}),
-      ...(e.waypoints !== undefined && e.waypoints.length > 0 ? { waypoints: e.waypoints } : {}),
-      style: {
-        strokeStyle: e.stroke,
-        arrowEnd: endHead,
-        arrowStart: startHead,
-        routing: e.routing,
-      },
+      ...(wps.length > 0 ? { waypoints: wps } : {}),
+      ...(fromPort !== undefined ? { fromPort } : {}),
+      ...(toPort !== undefined ? { toPort } : {}),
+      ...(e.labelPos !== undefined ? { labelPos: e.labelPos } : {}),
+      ...(e.labelOffset !== undefined ? { labelOff: e.labelOffset } : {}),
+      style: e.interaction !== undefined ? connectorStyle(e.interaction, base) : base,
     };
   });
+  const edgeById = new Map(diagram.edges.map((e) => [e.id, e]));
+  const edgeBetween = (a: string, b: string): string | undefined =>
+    diagram.edges.find((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a))?.id;
 
   const order = scenario.events.map((ev, index) => ({ ev, index }));
   order.sort((a, b) => a.ev.t - b.ev.t || a.index - b.index);
@@ -138,7 +184,8 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
   for (const { ev } of order) {
     if (ev.flowId !== undefined) usedFlow = true;
     switch (ev.type) {
-      case "packet":
+      case "packet": {
+        const probe = ev.variant === "probe";
         steps.push({
           id: ev.id,
           type: "message",
@@ -147,12 +194,34 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
           from: ev.from,
           to: ev.to,
           ...(ev.edgeId !== undefined ? { edgeId: ev.edgeId } : {}),
-          variant: ev.variant,
+          variant: probe ? PROBE_PACKET.variant : ev.variant,
           label: ev.label ?? "",
-          ...(ev.shape !== undefined ? { packet: ev.shape } : {}),
+          ...(probe
+            ? {
+                packet: ev.shape ?? PROBE_PACKET.packet,
+                packetSize: PROBE_PACKET.packetSize,
+                color: PROBE_PACKET.color,
+                trail: PROBE_PACKET.trail,
+              }
+            : ev.shape !== undefined
+              ? { packet: ev.shape }
+              : {}),
           ...(ev.count !== undefined && ev.count > 1 ? { packetCount: ev.count } : {}),
         });
+        // an explicitly asynchronous connector shows running dashes while the message travels
+        const edgeId = ev.edgeId ?? edgeBetween(ev.from, ev.to);
+        if (edgeId !== undefined && edgeById.get(edgeId)?.interaction === "async_message")
+          steps.push({
+            id: `${ev.id}~link`,
+            type: "link",
+            start: ev.t,
+            duration: ev.durationMs,
+            edgeId,
+            anim: "flow",
+            color: CONNECTOR_COLORS.async,
+          });
         break;
+      }
       case "node_state":
         steps.push({
           id: ev.id,
@@ -242,6 +311,8 @@ export function assertEngineSafe(doc: EngineDocument): AdaptError[] {
       bad(p, "message references an unknown node");
     if ((s.type === "state" || s.type === "timer") && !nodes.has(s.nodeId))
       bad(p, "step references an unknown node");
+    if (s.type === "link" && !doc.edges.some((e) => e.id === s.edgeId))
+      bad(p, "edge animation references an unknown edge");
   });
   return out;
 }

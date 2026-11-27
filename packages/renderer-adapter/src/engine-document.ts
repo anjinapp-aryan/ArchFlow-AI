@@ -10,6 +10,9 @@ export interface EngineEdgeStyle {
   arrowEnd?: string;
   arrowStart?: string;
   routing?: string;
+  color?: string;
+  width?: number;
+  labelColor?: string;
 }
 
 export interface EngineNode {
@@ -23,6 +26,8 @@ export interface EngineNode {
   subtitle?: string;
   /** Only set when the title must be smaller than the engine's default 15 px to fit the box. */
   style?: { fontSize: number };
+  /** Connection points (offsets from the node's top-left), referenced by edges. */
+  ports?: { id: string; dx: number; dy: number }[];
 }
 
 export interface EngineEdge {
@@ -32,6 +37,12 @@ export interface EngineEdge {
   label?: string;
   curve?: number;
   waypoints?: { x: number; y: number }[];
+  fromPort?: string;
+  toPort?: string;
+  /** Label anchor: fraction of the path length, perpendicular offset ("up" > 0), size (px). */
+  labelPos?: number;
+  labelOff?: number;
+  labelSize?: number;
   style: EngineEdgeStyle;
 }
 
@@ -48,6 +59,19 @@ export type EngineStep =
       label: string;
       packet?: string;
       packetCount?: number;
+      packetSize?: number;
+      color?: string;
+      trail?: boolean;
+    }
+  | {
+      /** Edge animation (e.g. running dashes along an asynchronous connector). */
+      id: string;
+      type: "link";
+      start: number;
+      duration: number;
+      edgeId: string;
+      anim: "flow" | "dash" | "solid" | "pulse";
+      color: string;
     }
   | {
       id: string;

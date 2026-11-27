@@ -1,5 +1,6 @@
 import {
   LIMITS,
+  edgeInteraction,
   validateCanonical,
   type CanonicalDocument,
   type CanonicalEdge,
@@ -21,6 +22,11 @@ import {
  *   (parallel flows).
  * - Optional failures turn one call into a failed attempt (timeout or error), followed by
  *   retries; the caller shows `warn` while waiting and recovers.
+ * - Monitoring connectors (health checks) are never request hops. They get their own flows:
+ *   periodic probe rounds, independent of request timing. Each probe is answered "healthy"
+ *   (success) or, when a failure is injected on that connector, times out / errors and marks
+ *   the target "unhealthy". Intervals written in labels ("every 30s") are kept as text only.
+ * - Explicit `response` connectors carry the responses of the call they answer.
  * - No randomness, no clock: same diagram + options = same scenario.
  */
 
@@ -100,7 +106,11 @@ export function synthesizeScenario(
   const add = (a: string, b: string, e: CanonicalEdge): void => {
     hops.set(a, [...(hops.get(a) ?? []), { to: b, edge: e }]);
   };
+  const isMonitoring = (e: CanonicalEdge): boolean => edgeInteraction(e) === "monitoring";
+  const isResponseEdge = (e: CanonicalEdge): boolean => edgeInteraction(e) === "response";
+  const monitorEdges = edges.filter(isMonitoring);
   for (const e of edges) {
+    if (isMonitoring(e) || isResponseEdge(e)) continue;
     if (e.direction === "forward") add(e.from, e.to, e);
     else if (e.direction === "backward") add(e.to, e.from, e);
     else {
@@ -110,6 +120,7 @@ export function synthesizeScenario(
   }
   const inbound = new Set<string>();
   for (const e of edges) {
+    if (isMonitoring(e) || isResponseEdge(e)) continue;
     if (e.direction === "forward") inbound.add(e.to);
     else if (e.direction === "backward") inbound.add(e.from);
   }
@@ -124,10 +135,21 @@ export function synthesizeScenario(
       nodes[0]!.id;
 
   const failures = new Map<string, { mode: "timeout" | "error"; retries: number; used: boolean }>();
+  const probeFailures = new Map<string, "timeout" | "error">();
   for (const f of options.failures ?? []) {
     const a = resolve(f.from, "failure caller");
     const b = resolve(f.to, "failure callee");
     if (a === undefined || b === undefined) continue;
+    if (monitorEdges.some((e) => e.from === a && e.to === b)) {
+      // a failing health check: the probes to this target fail; there is no request to retry
+      probeFailures.set(`${a}>${b}`, f.mode ?? "timeout");
+      if ((f.retries ?? 1) > 1)
+        warnings.push({
+          code: "synth.probe_retries_ignored",
+          message: `"${byId.get(a)!.label} -> ${byId.get(b)!.label}" is a health check: retries do not apply (every probe round checks again)`,
+        });
+      continue;
+    }
     const retries = Math.max(1, Math.min(9, Math.floor(f.retries ?? 1)));
     failures.set(`${a}>${b}`, { mode: f.mode ?? "timeout", retries, used: false });
   }
@@ -178,7 +200,17 @@ export function synthesizeScenario(
     return id;
   };
   const isAsync = (a: string, b: string, e: CanonicalEdge): boolean =>
-    e.stroke !== "solid" || isQueueLike(byId.get(a)!) || isQueueLike(byId.get(b)!);
+    edgeInteraction(e) === "async_message" ||
+    isQueueLike(byId.get(a)!) ||
+    isQueueLike(byId.get(b)!);
+  /** Explicit return connector b -> a, if the diagram draws one. */
+  const responseEdge = (a: string, b: string, fallback: CanonicalEdge): string =>
+    edges.find(
+      (e) =>
+        isResponseEdge(e) &&
+        ((e.from === b && e.to === a && e.direction !== "backward") ||
+          (e.from === a && e.to === b && e.direction === "backward")),
+    )?.id ?? fallback.id;
   const reached = new Set<string>([entry!]);
 
   /** Node `n` received work at `t` in `flow`; returns when it is done (ready to answer). */
@@ -324,7 +356,7 @@ export function synthesizeScenario(
       t: respondAt,
       from: b,
       to: a,
-      edgeId: e.id,
+      edgeId: responseEdge(a, b, e),
       variant: "response",
       label: "ok",
       flowId: flow,
@@ -347,6 +379,112 @@ export function synthesizeScenario(
       message: `no connector leaves the entry component "${byId.get(entry!)!.label}"`,
     });
   else if (responses) state(entry!, "success", end, end + 1500, mainFlow);
+  // --- health checks: periodic probe rounds, independent of request traffic -------------------
+  const monitorOnly = new Set(
+    nodes
+      .filter((n) => {
+        const touching = edges.filter((e) => e.from === n.id || e.to === n.id);
+        return touching.length > 0 && touching.every((e) => isMonitoring(e) && e.from === n.id);
+      })
+      .map((n) => n.id),
+  );
+  if (monitorEdges.length > 0) {
+    const probeMs = Math.round(packetMs * 0.8);
+    const reqEnd = Math.max(end, start + 4000);
+    const rounds = Math.max(2, Math.min(4, Math.round((reqEnd - start) / 5000)));
+    const period = Math.max(probeMs * 3 + 600, Math.floor((reqEnd - start) / rounds));
+    // node states must not overlap (validator rule), so a status flash takes the next free slot
+    const busy = (nodeId: string, t0: number, t1: number): number | undefined => {
+      let clash: number | undefined;
+      for (const ev of events) {
+        const touches =
+          (ev.type === "node_state" && ev.nodeId === nodeId) ||
+          // request traffic at this node: an "unhealthy" flash then would contradict it
+          (ev.type === "packet" &&
+            !healthFlows.has(ev.flowId ?? "") &&
+            (ev.from === nodeId || ev.to === nodeId));
+        if (touches && ev.t < t1 && t0 < ev.t + ev.durationMs)
+          clash = Math.max(clash ?? 0, ev.t + ev.durationMs);
+      }
+      return clash;
+    };
+    const freeSlot = (
+      nodeId: string,
+      t: number,
+      dur: number,
+      maxSlip: number,
+    ): number | undefined => {
+      let at = t;
+      for (let i = 0; i < 50; i++) {
+        const c = busy(nodeId, at, at + dur);
+        if (c === undefined) return at;
+        at = c;
+        if (at - t > maxSlip) return undefined;
+      }
+      return undefined;
+    };
+    const healthFlows = new Set<string>();
+    for (let k = 0; k < rounds; k++) {
+      const flow = newFlow(`Health check round ${k + 1}`);
+      healthFlows.add(flow);
+      monitorEdges.forEach((e, j) => {
+        const [src, dst] = e.direction === "backward" ? [e.to, e.from] : [e.from, e.to];
+        reached.add(src);
+        const t = start + 200 + k * period + j * 150;
+        const probe = packet({
+          t,
+          durationMs: probeMs,
+          from: src,
+          to: dst,
+          edgeId: e.id,
+          variant: "probe",
+          // no packet label: the connector already says what the probe is
+          flowId: flow,
+        });
+        const arrive = t + probeMs;
+        const mode = probeFailures.get(`${src}>${dst}`);
+        if (mode === "timeout") {
+          events.push({
+            type: "timeout",
+            id: nextId("t"),
+            t,
+            durationMs: timeoutMs,
+            flowId: flow,
+            nodeId: src,
+            waitingFor: probe.id,
+            label: "no answer",
+          });
+        } else {
+          packet({
+            t: arrive + 100,
+            durationMs: probeMs,
+            from: dst,
+            to: src,
+            edgeId: e.id,
+            variant: mode === "error" ? "error" : "success",
+            ...(k === 0 ? { label: mode === "error" ? "unhealthy" : "healthy" } : {}),
+            flowId: flow,
+            respondsTo: probe.id,
+          });
+        }
+        const flashAt = mode === "timeout" ? t + timeoutMs : arrive;
+        const flash = freeSlot(dst, flashAt, 900, 1200);
+        if (flash !== undefined)
+          events.push({
+            type: "node_state",
+            id: nextId("s"),
+            t: flash,
+            durationMs: 900,
+            flowId: flow,
+            nodeId: dst,
+            state: mode ? "down" : "success",
+            label: mode ? "unhealthy" : "healthy",
+          });
+      });
+    }
+    for (const id of monitorOnly) reached.add(id);
+  }
+
   for (const f of failures.values())
     if (!f.used)
       warnings.push({

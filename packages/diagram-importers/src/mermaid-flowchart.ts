@@ -1,6 +1,11 @@
-import type { CanonicalEdge, CanonicalGroup, CanonicalNode } from "@archflow/canonical-model";
+import {
+  looksLikeMonitoring,
+  type CanonicalEdge,
+  type CanonicalGroup,
+  type CanonicalNode,
+} from "@archflow/canonical-model";
 import { IdMapper, Issues, fitLabel } from "./common.ts";
-import { layoutGraph, type RankDir } from "./layout.ts";
+import { applyRoutes, layoutGraph, type RankDir } from "./layout.ts";
 import { ignorable, slug, unquote, type Statement } from "./mermaid-text.ts";
 
 /**
@@ -430,6 +435,21 @@ export function parseFlowchart(
     });
   });
 
+  // connector semantics: dotted links are asynchronous; health checks are monitoring
+  const nodeLabel = new Map(canonicalNodes.map((n) => [n.id, n.label]));
+  const inferred: string[] = [];
+  for (const e of edges) {
+    if (looksLikeMonitoring(e.label, { label: nodeLabel.get(e.from) ?? "" })) {
+      e.interaction = "monitoring";
+      inferred.push(`${nodeLabel.get(e.from)} -> ${nodeLabel.get(e.to)}`);
+    } else e.interaction = e.stroke === "solid" ? "sync_request" : "async_message";
+  }
+  if (inferred.length)
+    issues.warn(
+      "mermaid.monitoring_inferred",
+      `treated as health checks (monitoring, not request routing): ${inferred.slice(0, 5).join("; ")}${inferred.length > 5 ? "; …" : ""}`,
+    );
+
   // layout
   const placed = layoutGraph(
     canonicalNodes.map((n) => ({
@@ -443,10 +463,19 @@ export function parseFlowchart(
       label: g.label,
       ...(g.parentId ? { parent: g.parentId } : {}),
     })),
-    edges.map((e) => ({ from: e.from, to: e.to, ...(e.label ? { label: e.label } : {}) })),
+    edges.map((e) => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      ...(e.label ? { label: e.label } : {}),
+      ...(e.interaction ? { interaction: e.interaction } : {}),
+      arrowStart: e.direction === "backward" || e.direction === "both",
+      arrowEnd: e.direction === "forward" || e.direction === "both",
+    })),
     rankdir,
   );
   for (const n of canonicalNodes) Object.assign(n, placed.nodes.get(n.id)!);
+  applyRoutes(edges, placed.edges);
   for (const g of groups) g.frame = placed.groups.get(g.id)!;
   const rewritten = nodeIds.rewritten + groupIds.rewritten;
   if (rewritten > 0)
