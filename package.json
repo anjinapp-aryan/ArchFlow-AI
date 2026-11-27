@@ -22,6 +22,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
+    "smoke:live": "vitest run --project browser apps/web/test/app.browser.test.ts",
     "golden:update": "node scripts/golden-update.mjs",
     "licenses:check": "node scripts/check-licenses.mjs",
     "licenses:collect": "node scripts/collect-licenses.mjs",

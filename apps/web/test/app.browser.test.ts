@@ -9,9 +9,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseCanonical } from "@archflow/canonical-model";
 import { launch } from "@archflow/qa";
 
-/** End-to-end test of the PRODUCTION build, served with its real `_headers` (CSP included). */
+/**
+ * End-to-end test of the PRODUCTION build, served with its real `_headers` (CSP included).
+ * Set ARCHFLOW_BASE_URL (e.g. the deployed workers.dev URL) to run the same checks against a
+ * live deployment instead of a local build: `npm run smoke:live`.
+ */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-let server: Server;
+const liveUrl = process.env.ARCHFLOW_BASE_URL;
+let server: Server | undefined;
 let base = "";
 let browser: Browser;
 let page: Page;
@@ -19,16 +24,20 @@ const problems: string[] = [];
 let downloads = "";
 
 beforeAll(async () => {
-  const b = spawnSync(process.execPath, [resolve(repoRoot, "apps/web/build.mjs")], {
-    encoding: "utf8",
-  });
-  if (b.status !== 0) throw new Error(`web build failed: ${b.stderr}`);
-  const mod = (await import(resolve(repoRoot, "scripts/serve-web.mjs"))) as {
-    startServer(p: number): Promise<Server>;
-  };
-  server = await mod.startServer(0);
-  const addr = server.address();
-  base = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}/`;
+  if (liveUrl) {
+    base = liveUrl.endsWith("/") ? liveUrl : `${liveUrl}/`;
+  } else {
+    const b = spawnSync(process.execPath, [resolve(repoRoot, "apps/web/build.mjs")], {
+      encoding: "utf8",
+    });
+    if (b.status !== 0) throw new Error(`web build failed: ${b.stderr}`);
+    const mod = (await import(resolve(repoRoot, "scripts/serve-web.mjs"))) as {
+      startServer(p: number): Promise<Server>;
+    };
+    server = await mod.startServer(0);
+    const addr = server.address();
+    base = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}/`;
+  }
   browser = (await launch()).browser;
   page = await browser.newPage();
   page.on("console", (m) => {
