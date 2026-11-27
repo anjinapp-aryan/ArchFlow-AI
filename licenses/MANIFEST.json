@@ -1,6 +1,6 @@
 {
   "AnimatedDiagrams-MIT.txt": {
-    "sha256": "b467df46b73b5f624f74ae0691104cac6b80fd269a4627265dd0dd4ab03bb239",
+    "sha256": "b8f159daa6dec6bc071d5ea6bbaa85ce3a0c261a8b13662af1f271160eb66d7a",
     "covers": "AnimatedDiagrams engine (ad_engine, Player.cpp)"
   },
   "nlohmann-json-MIT.txt": {

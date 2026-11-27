@@ -5,7 +5,7 @@
 //
 // Run after `npm run engine:build`. CI fails if licenses/ differs from a fresh collection.
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -89,6 +89,10 @@ items.push(
   ],
 );
 
+// Upstream checkouts carry platform line endings (CRLF on Windows with core.autocrlf), so copy
+// licence texts with LF endings: the committed bytes and their SHA-256 must not depend on the OS.
+const copyText = (src, dst) => writeFileSync(dst, toLf(readFileSync(src, "utf8")));
+const toLf = (text) => text.replace(/\r\n?/g, "\n");
 const sha = (f) => createHash("sha256").update(readFileSync(f)).digest("hex");
 mkdirSync(outDir, { recursive: true });
 const missing = items.filter(([, src]) => !existsSync(src));
@@ -101,7 +105,7 @@ if (missing.length) {
 }
 
 // nanosvg: the licence is the header comment of nanosvg.h itself (zlib licence + attribution notes).
-const nano = readFileSync(join(deps, "nanosvg-src", "nanosvg.h"), "utf8");
+const nano = toLf(readFileSync(join(deps, "nanosvg-src", "nanosvg.h"), "utf8"));
 const end = nano.indexOf("*/");
 if (!nano.startsWith("/*") || end < 0) {
   console.error("[licenses] unexpected nanosvg.h header layout");
@@ -116,7 +120,7 @@ writeFileSync(join(outDir, "nanosvg-Zlib.txt"), nanoText);
 
 const manifest = {};
 for (const [name, src, covers] of items) {
-  copyFileSync(src, join(outDir, name));
+  copyText(src, join(outDir, name));
   manifest[name] = { sha256: sha(join(outDir, name)), covers };
 }
 manifest["nanosvg-Zlib.txt"] = {
@@ -128,7 +132,7 @@ manifest["nanosvg-Zlib.txt"] = {
 // engine link inventory (which archive members were linked), copied for audit
 const inputs = join(root, "build", "engine", "link-inputs.txt");
 if (existsSync(inputs)) {
-  copyFileSync(inputs, join(outDir, "ENGINE_LINK_INPUTS.txt"));
+  copyText(inputs, join(outDir, "ENGINE_LINK_INPUTS.txt"));
   manifest["ENGINE_LINK_INPUTS.txt"] = {
     sha256: sha(join(outDir, "ENGINE_LINK_INPUTS.txt")),
     covers: "archive members linked into the WASM (wasm-ld map)",
