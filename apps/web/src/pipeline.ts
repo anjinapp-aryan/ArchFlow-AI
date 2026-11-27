@@ -5,7 +5,11 @@ import {
   importPlantUml,
   type ImportIssue,
 } from "@archflow/diagram-importers";
-import { serializeEngineDocument, toEngineDocument } from "@archflow/renderer-adapter";
+import {
+  serializeEngineDocument,
+  toEngineDocument,
+  type TitleMeasurer,
+} from "@archflow/renderer-adapter";
 import {
   parseDescription,
   synthesizeScenario,
@@ -84,6 +88,8 @@ export async function prepare(
   kind: SourceKind,
   text: string,
   user: UserScenarioOptions = {},
+  /** Real title widths from the browser canvas; titles then fit the fonts this machine has. */
+  measureTitle?: TitleMeasurer,
 ): Promise<PrepareResult> {
   const issues: Issue[] = [];
   let diagram: CanonicalDocument;
@@ -139,7 +145,10 @@ export async function prepare(
     scenarioOrigin = "generated";
   }
 
-  const a = toEngineDocument(document, { groups: "flatten" });
+  const a = toEngineDocument(document, {
+    groups: "flatten",
+    ...(measureTitle ? { measureTitle } : {}),
+  });
   if (!a.ok) return { ok: false, issues: [...issues, ...a.errors.map(err)] };
   issues.push(...a.warnings.filter((w) => w.code !== "info.flow_ids_not_rendered").map(warn));
   return {

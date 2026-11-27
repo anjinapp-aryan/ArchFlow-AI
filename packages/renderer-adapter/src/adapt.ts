@@ -28,7 +28,16 @@ export interface AdaptOptions {
    * `info.groups_flattened` (an explicit, visible loss, never a silent one).
    */
   groups?: "reject" | "flatten";
+  /**
+   * Real width (px) of `label` drawn bold at `fontPx`, as the painter will draw it. In a browser,
+   * pass a canvas measurer so titles fit with the fonts actually installed (fallback fonts differ
+   * by OS, e.g. DejaVu Sans on Linux is ~14% wider than Segoe UI). Without it the deterministic
+   * estimate is used.
+   */
+  measureTitle?: TitleMeasurer;
 }
+
+export type TitleMeasurer = (label: string, fontPx: number) => number;
 
 export type AdaptResult =
   | { ok: true; document: EngineDocument; warnings: AdaptError[] }
@@ -99,7 +108,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     w: n.w,
     h: n.h,
     ...(n.subtitle !== undefined ? { subtitle: n.subtitle } : {}),
-    ...fitTitle(n.label, n.kind, n.w),
+    ...fitTitle(n.label, n.kind, n.w, options.measureTitle),
   }));
 
   const edges: EngineEdge[] = diagram.edges.map((e) => {
@@ -248,12 +257,21 @@ export const MIN_TITLE_PX = 9;
 /**
  * Titles are drawn bold 15 px by the engine. When a box from fixed geometry (draw.io, JSON) is
  * too narrow, choose the largest size (in 0.5 px steps, >= 9 px) that fits. Boxes that fit keep
- * the engine default, so their output is unchanged.
+ * the engine default, so their output is unchanged. With `measure`, real font widths decide;
+ * without it, the deterministic estimate does.
  */
-export function fitTitle(label: string, kind: string, w: number): { style?: { fontSize: number } } {
+export function fitTitle(
+  label: string,
+  kind: string,
+  w: number,
+  measure?: TitleMeasurer,
+): { style?: { fontSize: number } } {
   const room = titleRoom(kind, w);
-  const need = titleWidth(label);
+  const width = measure ?? ((text: string, px: number) => titleWidth(text, px));
+  const need = width(label, TITLE_FONT_PX);
   if (need <= room) return {};
-  const px = Math.max(MIN_TITLE_PX, Math.floor(((TITLE_FONT_PX * room) / need) * 2) / 2);
+  let px = Math.max(MIN_TITLE_PX, Math.floor(((TITLE_FONT_PX * room) / need) * 2) / 2);
+  // real text does not scale exactly linearly (hinting, rounding): confirm and step down
+  while (px > MIN_TITLE_PX && width(label, px) > room) px -= 0.5;
   return { style: { fontSize: px } };
 }

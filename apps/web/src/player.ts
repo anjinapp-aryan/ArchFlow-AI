@@ -1,4 +1,11 @@
-import { BrowserText, EngineHost, paintFrame, type EngineFactory } from "@archflow/engine-host";
+import {
+  BrowserText,
+  EngineHost,
+  paintFrame,
+  REF_PX,
+  type EngineFactory,
+} from "@archflow/engine-host";
+import type { TitleMeasurer } from "@archflow/renderer-adapter";
 
 /**
  * Interactive player: our own clock drives the WASM engine and our painter draws each frame,
@@ -39,6 +46,10 @@ export class Player {
     const engine = await EngineHost.create(factory, text.measure);
     return new Player(engine, text, canvas);
   }
+
+  /** Bold title width at `fontPx`, measured exactly as the painter draws titles. */
+  readonly measureTitle: TitleMeasurer = (label, fontPx) =>
+    (this.text.measure(label, true, "") * fontPx) / REF_PX;
 
   load(engineJson: string): { ok: true } | { ok: false; error: string } {
     this.pause();

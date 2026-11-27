@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertEngineSafe, serializeEngineDocument, toEngineDocument } from "../src/index.ts";
+import {
+  assertEngineSafe,
+  fitTitle,
+  MIN_TITLE_PX,
+  serializeEngineDocument,
+  toEngineDocument,
+} from "../src/index.ts";
 
 const root = new URL("../../../fixtures/scenarios/", import.meta.url);
 const load = (rel: string): unknown => JSON.parse(readFileSync(new URL(rel, root), "utf8"));
@@ -143,5 +149,43 @@ describe("groups: explicit flatten option", () => {
       expect(serializeEngineDocument(b.document)).toBe(serializeEngineDocument(a.document));
       expect(b.warnings).toEqual(a.warnings);
     }
+  });
+});
+
+describe("fitTitle with a real font measurer", () => {
+  // a font 30% wider than the estimate, like a wide fallback font on another OS
+  const wide = (label: string, px: number): number => label.length * 9 * 1.3 * (px / 15);
+
+  it("keeps the engine default when the measured title fits", () => {
+    expect(fitTitle("API", "service", 200, wide)).toEqual({});
+  });
+
+  it("shrinks until the measured width fits the room", () => {
+    const fit = fitTitle("Authentication Service", "service", 220, wide);
+    const px = fit.style!.fontSize;
+    expect(px).toBeLessThan(15);
+    expect(px).toBeGreaterThanOrEqual(MIN_TITLE_PX);
+    expect(wide("Authentication Service", px)).toBeLessThanOrEqual(220 - 50);
+    expect(wide("Authentication Service", px + 0.5)).toBeGreaterThan(220 - 50);
+  });
+
+  it("never goes below the minimum size", () => {
+    expect(fitTitle("x".repeat(200), "service", 120, wide)).toEqual({
+      style: { fontSize: MIN_TITLE_PX },
+    });
+  });
+
+  it("is used by toEngineDocument", () => {
+    const doc = JSON.parse(
+      readFileSync(
+        new URL("../../../fixtures/scenarios/order-flow.canonical.json", import.meta.url),
+        "utf8",
+      ),
+    ) as unknown;
+    const plain = toEngineDocument(doc);
+    const measured = toEngineDocument(doc, { measureTitle: () => 10_000 });
+    if (!plain.ok || !measured.ok) throw new Error("adapt failed");
+    expect(measured.document.nodes.every((n) => n.style?.fontSize === MIN_TITLE_PX)).toBe(true);
+    expect(plain.document.nodes.some((n) => n.style === undefined)).toBe(true);
   });
 });

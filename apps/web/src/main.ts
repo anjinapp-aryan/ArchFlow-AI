@@ -147,7 +147,7 @@ async function run(options: UserScenarioOptions | undefined, keepControls: boole
   if (!player) return;
   ui.animate.disabled = true;
   try {
-    const r = await prepare(kind, ui.source.value, options ?? {});
+    const r = await prepare(kind, ui.source.value, options ?? {}, player.measureTitle);
     showIssues(r.issues);
     if (!r.ok) {
       ui.origin.textContent = "Fix the errors below, then animate again.";
