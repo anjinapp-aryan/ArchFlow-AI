@@ -19,7 +19,7 @@ export const GOLDEN_CASES = [
     // regression fixture: orthogonal routing, connector semantics, health-check probes
     id: "aws-alb",
     file: "aws-alb.canonical.json",
-    times: [0, 900, 1500, 2100, 2700, 6500, 7400, 8100, 12300, 13500, 17500],
+    times: [0, 700, 1500, 2100, 2700, 6500, 7300, 8100, 12300, 13500, 16500],
   },
 ] as const;
 

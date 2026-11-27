@@ -105,4 +105,54 @@ describe("health checks", () => {
     const { doc: plain } = run("Client -> API -> DB");
     expect(packets(plain).some((p) => p.variant === "probe")).toBe(false);
   });
+
+  describe("routing around unhealthy targets (phase 2)", () => {
+    const { doc } = run(ALB);
+    const id = (l: string): string => doc.diagram.nodes.find((n) => n.label === l)!.id;
+    const states = doc.scenario!.events.filter((e) => e.type === "node_state");
+    const firstUnhealthy = Math.min(
+      ...states
+        .filter((s) => s.label === "unhealthy" && s.nodeId === id("Order API"))
+        .map((s) => s.t),
+    );
+
+    it("sends no request to a target once health checks marked it unhealthy", () => {
+      const toOrder = packets(doc).filter(
+        (p) => p.to === id("Order API") && ["request", "retry"].includes(p.variant),
+      );
+      for (const p of toOrder) expect(p.t).toBeLessThan(firstUnhealthy);
+    });
+
+    it("sends the request to a healthy alternative instead, and says why", () => {
+      const toPayment = packets(doc).filter(
+        (p) => p.from === id("API TG") && p.to === id("Payment API") && p.variant === "request",
+      );
+      expect(toPayment.length).toBe(1);
+      const notes = doc.scenario!.events.filter((e) => e.type === "note");
+      expect(notes.map((n) => (n.type === "note" ? n.text : ""))).toEqual([
+        "Order API skipped: unhealthy",
+      ]);
+      expect(notes[0]!.t).toBeGreaterThanOrEqual(firstUnhealthy);
+    });
+
+    it("still sends traffic when no healthy alternative remains", () => {
+      const { doc: d } = run(
+        ALB.replace(
+          "fail: ALB Health Check -> Order API timeout retries 1",
+          "fail: ALB Health Check -> Frontend ECS timeout",
+        ),
+      );
+      const fe = d.diagram.nodes.find((n) => n.label === "Frontend ECS")!.id;
+      expect(packets(d).some((p) => p.to === fe && p.variant === "request")).toBe(true);
+      expect(d.scenario!.events.some((e) => e.type === "note")).toBe(false);
+    });
+
+    it("without a failing health check, every target gets traffic", () => {
+      const { doc: d } = run(
+        ALB.replace("fail: ALB Health Check -> Order API timeout retries 1", ""),
+      );
+      const order = d.diagram.nodes.find((n) => n.label === "Order API")!.id;
+      expect(packets(d).some((p) => p.to === order && p.variant === "request")).toBe(true);
+    });
+  });
 });

@@ -199,6 +199,12 @@ export function synthesizeScenario(
     });
     return id;
   };
+  /**
+   * A packet repeats its connector's label only when the connector has none: the engine draws a
+   * packet's label riding just above it, so a copy of the connector label would only cover it.
+   */
+  const packetLabel = (e: CanonicalEdge, fallback: string): { label?: string } =>
+    e.label ? {} : { label: fallback };
   const isAsync = (a: string, b: string, e: CanonicalEdge): boolean =>
     edgeInteraction(e) === "async_message" ||
     isQueueLike(byId.get(a)!) ||
@@ -226,7 +232,14 @@ export function synthesizeScenario(
     let cur = t;
     const asyncCalls = calls.filter((c) => isAsync(n, c.to, c.edge));
     const syncCalls = calls.filter((c) => !isAsync(n, c.to, c.edge));
+    const unhealthyAt = (id: string, at: number): boolean =>
+      (unhealthySince.get(id) ?? Number.POSITIVE_INFINITY) <= at;
     for (const c of syncCalls) {
+      // like a load balancer: skip a target known to be unhealthy while a healthy one remains
+      if (unhealthyAt(c.to, cur) && syncCalls.some((o) => o !== c && !unhealthyAt(o.to, cur))) {
+        skipped(c.to, cur, flow);
+        continue;
+      }
       reached.add(c.to);
       cur = call(n, c.to, c.edge, cur, flow, path);
     }
@@ -243,7 +256,7 @@ export function synthesizeScenario(
           to: c.to,
           edgeId: c.edge.id,
           variant: "event",
-          label: c.edge.label ?? "event",
+          ...packetLabel(c.edge, "event"),
           // a publisher's message belongs to its own flow; a queue's deliveries start the child flows
           flowId: isQueueLike(byId.get(n)!) ? child : flow,
         });
@@ -302,7 +315,7 @@ export function synthesizeScenario(
                 : "retry failed"
               : retry
                 ? "retry"
-                : (e.label ?? "request"),
+                : (packetLabel(e, "request").label ?? ""),
           flowId: flow,
           ...(attempt > 1 ? { attempt } : {}),
           ...(retry ? { retryOf: previous!.id } : {}),
@@ -343,7 +356,7 @@ export function synthesizeScenario(
       to: b,
       edgeId: e.id,
       variant: previous ? "retry" : "request",
-      label: previous ? "retry" : (e.label ?? "request"),
+      ...(previous ? { label: "retry" } : packetLabel(e, "request")),
       flowId: flow,
       ...(previous ? { attempt: (previous.attempt ?? 1) + 1, retryOf: previous.id } : {}),
     });
@@ -365,8 +378,36 @@ export function synthesizeScenario(
     return respondAt + packetMs + gapMs;
   };
 
-  const mainFlow = newFlow(`${byId.get(entry!)!.label} request`);
   const start = 300;
+  const probeMs = Math.round(packetMs * 0.8);
+  /** First probe round: when the probe on monitoring connector #j starts. */
+  const firstProbeAt = (j: number): number => start + 200 + j * 150;
+  /**
+   * A target becomes known-unhealthy when its first failed probe concludes (timeout expired, or
+   * the error answer arrived). Request traffic reaching it later avoids it if it can.
+   */
+  const unhealthySince = new Map<string, number>();
+  monitorEdges.forEach((e, j) => {
+    const [src, dst] = e.direction === "backward" ? [e.to, e.from] : [e.from, e.to];
+    const mode = probeFailures.get(`${src}>${dst}`);
+    if (!mode) return;
+    const known = firstProbeAt(j) + (mode === "timeout" ? timeoutMs : 2 * probeMs + 100);
+    unhealthySince.set(dst, Math.min(unhealthySince.get(dst) ?? known, known));
+  });
+  const skipped = (target: string, t: number, flow: string): void => {
+    const n = byId.get(target)!;
+    events.push({
+      type: "note",
+      id: nextId("n"),
+      t,
+      durationMs: 1600,
+      flowId: flow,
+      text: `${n.label} skipped: unhealthy`.slice(0, 500),
+      x: n.x,
+      y: Math.max(0, n.y - 34),
+    });
+  };
+  const mainFlow = newFlow(`${byId.get(entry!)!.label} request`);
   const end = visit(entry!, start, mainFlow, new Set([entry!]));
   if (truncated)
     warnings.push({
@@ -389,7 +430,6 @@ export function synthesizeScenario(
       .map((n) => n.id),
   );
   if (monitorEdges.length > 0) {
-    const probeMs = Math.round(packetMs * 0.8);
     const reqEnd = Math.max(end, start + 4000);
     const rounds = Math.max(2, Math.min(4, Math.round((reqEnd - start) / 5000)));
     const period = Math.max(probeMs * 3 + 600, Math.floor((reqEnd - start) / rounds));
@@ -430,7 +470,8 @@ export function synthesizeScenario(
       monitorEdges.forEach((e, j) => {
         const [src, dst] = e.direction === "backward" ? [e.to, e.from] : [e.from, e.to];
         reached.add(src);
-        const t = start + 200 + k * period + j * 150;
+        const t = firstProbeAt(j) + k * period;
+        reached.add(dst);
         const probe = packet({
           t,
           durationMs: probeMs,

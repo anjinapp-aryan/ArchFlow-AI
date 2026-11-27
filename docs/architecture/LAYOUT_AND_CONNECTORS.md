@@ -26,7 +26,9 @@ The code is in `packages/diagram-importers/src/layout.ts`. Geometry shared with 
    - Lane order matches track order, which gives no crossings within one checker's connectors.
 7. **Place labels.**
    - Each label is tried at candidate positions along its own connector. Request labels try the last segment first, next to the target; monitoring labels try lanes first.
-   - The first position that touches no node and no placed label wins. Positions are computed with the engine's own `PointAlong` math, so the label lands exactly there.
+   - On horizontal segments labels go **below** the line first. The engine draws a moving packet's own label just above the packet, so a label above the line would be crossed by every packet.
+   - A label must also stay 7 px clear of every segment of its own connector, the corridor its packets use.
+   - The first position that touches no node, no placed label and no packet corridor wins. Positions are computed with the engine's own `PointAlong` math, so the label lands exactly there.
    - If any label cannot be placed, spacing grows and the layout repeats, up to 5 attempts, keeping the best.
 8. **Other directions.** Top-to-bottom, bottom-to-top and right-to-left layouts are computed in a left-to-right frame and mapped back.
 
@@ -60,7 +62,7 @@ See `SYNTHESIZER.md`. In short:
 - **Probes:** periodic rounds in their own flows, independent of request timing.
 - **Results:** healthy targets answer on the same connector. An injected failure on a health check makes probes time out or error and marks the target "unhealthy".
 - **No invented configuration:** interval text stays a label, and no thresholds are invented.
-- **Phase 2:** routing round-robin traffic away from targets marked unhealthy.
+- **Unhealthy targets:** once a target is known unhealthy, request traffic with a healthy alternative skips it, and a note says so.
 
 ## Readability of large diagrams
 
@@ -71,7 +73,8 @@ Labels keep the engine's 12 px, and gaps grow to fit them; text is never shrunk.
 - **`apps/web/test/routing.test.ts`**, run on every generated-geometry fixture (all text, Mermaid flowchart and PlantUML component fixtures):
   - every segment horizontal or vertical;
   - no connector through a node;
-  - no label on a node or on another label;
+  - no label on a node, on another label or in its own packet corridor;
+  - no generated packet repeating its connector's label;
   - crossings at or below a per-fixture maximum (currently 0 everywhere);
   - byte-identical output on a second run.
 - **AWS ALB checks** in the same file: column order, health checker below the request flow, monitoring connectors, zero crossings, and reported inference.
@@ -80,6 +83,7 @@ Labels keep the engine's 12 px, and gaps grow to fit them; text is never shrunk.
   - separate flows;
   - healthy and unhealthy results;
   - the injected failure;
+  - unhealthy targets skipped only while a healthy alternative exists, with a note;
   - no invented configuration;
   - determinism.
 - **`packages/renderer-adapter/test/adapt.test.ts`**: styles per interaction, probe packets, async link animation, document-unique ports, label anchors.

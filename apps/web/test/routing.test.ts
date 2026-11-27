@@ -59,6 +59,12 @@ describe("auto-layout routing (every generated-geometry fixture)", () => {
     expect(rep.throughNodes).toEqual([]);
     expect(rep.labelOnNode).toEqual([]);
     expect(rep.labelOnLabel).toEqual([]);
+    expect(rep.labelOnOwnPackets).toEqual([]);
+    // a generated packet never repeats its connector's label (it would ride over it)
+    const edgeLabel = new Map(r.document.diagram.edges.map((e) => [e.id, e.label]));
+    for (const ev of r.document.scenario!.events)
+      if (ev.type === "packet" && ev.edgeId !== undefined && edgeLabel.get(ev.edgeId) !== undefined)
+        expect(ev.label).not.toBe(edgeLabel.get(ev.edgeId));
     expect(rep.crossings).toBeLessThanOrEqual(MAX_CROSSINGS[name] ?? 0);
     // deterministic: same input, byte-identical engine document
     const again = await prepare(kind, text);

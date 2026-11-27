@@ -85,6 +85,10 @@ export const NODE_H = 60;
 /** Engine default edge label size (px); labels are laid out for exactly this size. */
 export const EDGE_LABEL_PX = 12;
 const LABEL_H = 18;
+/** Gap between a connector and its label: keeps the label clear of packets riding the line. */
+const LABEL_CLEAR = 8;
+/** Half the height of a packet riding a connector (engine capsule, size 1). */
+const PACKET_HALF = 7;
 const GROUP_TITLE_BAND = 28;
 const GROUP_PAD = 16;
 const MARGIN = 20;
@@ -473,7 +477,7 @@ function attemptLayout(
   // labelled lanes are spaced so their labels fit above them
   let laneCursor = laneTop;
   laneOrder.forEach((m, i) => {
-    if (i > 0) laneCursor += m.e.label ? LABEL_H + 8 : TRACK;
+    if (i > 0) laneCursor += m.e.label ? LABEL_H + LABEL_CLEAR + 8 : TRACK;
     laneY.set(m.key, laneCursor);
   });
   const monNodeTop = laneCursor + BAND_GAP;
@@ -652,7 +656,23 @@ function placeLabel(
   const isH = (i: number): boolean => Math.abs(path[i + 1]!.y - path[i]!.y) < 0.5;
   const order = monitoring
     ? [...segs].sort((a, b) => Number(isH(b.i)) - Number(isH(a.i)) || b.len - a.len || a.i - b.i)
-    : [...segs].reverse().sort((a, b) => (b.len >= w + 12 ? 1 : 0) - (a.len >= w + 12 ? 1 : 0));
+    : [...segs]
+        .reverse()
+        .sort(
+          (a, b) =>
+            Number(isH(b.i) && b.len >= w + 12) - Number(isH(a.i) && a.len >= w + 12) ||
+            Number(b.len >= w + 12) - Number(a.len >= w + 12),
+        );
+  // packets ride every segment of this connector: a label must stay out of that corridor
+  const corridors: Rect[] = path.slice(1).map((b, i) => {
+    const a = path[i]!;
+    return {
+      x: Math.min(a.x, b.x) - PACKET_HALF,
+      y: Math.min(a.y, b.y) - PACKET_HALF,
+      w: Math.abs(a.x - b.x) + 2 * PACKET_HALF,
+      h: Math.abs(a.y - b.y) + 2 * PACKET_HALF,
+    };
+  });
   let fallback: { pos: number; off: number; box: Rect } | undefined;
   for (const s of order) {
     const a = path[s.i]!;
@@ -660,7 +680,12 @@ function placeLabel(
     const horizontal = Math.abs(b.y - a.y) < 0.5;
     const along = horizontal ? w : h;
     if (s.len < 8) continue;
-    const offs = horizontal ? [h / 2 + 2, -(h / 2 + 2)] : [w / 2 + 5, -(w / 2 + 5)];
+    // below a horizontal line first: the engine draws a moving packet's own label 16 px above
+    // the packet, so a connector label above the line would be crossed by every packet label
+    // and clear of the packet itself (capsules are ~14 px tall, centred on the line)
+    const offs = horizontal
+      ? [-(h / 2 + LABEL_CLEAR), h / 2 + LABEL_CLEAR]
+      : [w / 2 + LABEL_CLEAR + 3, -(w / 2 + LABEL_CLEAR + 3)];
     for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) {
       const lenAt = cum[s.i]! + s.len * f;
       // keep the label alongside this segment, clear of its corners
@@ -673,6 +698,7 @@ function placeLabel(
         fallback ??= { pos, off, box: bx };
         if (nodeRects.some((r) => overlaps(bx, r, 3))) continue;
         if (placed.some((r) => overlaps(bx, r, 2))) continue;
+        if (corridors.some((r) => overlaps(bx, r))) continue;
         return { pos: round4(pos), off: Math.round(off * 10) / 10, box: bx, conflict: false };
       }
     }

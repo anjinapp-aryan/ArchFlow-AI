@@ -18,6 +18,8 @@ export interface RoutingReport {
   throughNodes: string[];
   labelOnNode: string[];
   labelOnLabel: string[];
+  /** Label inside the corridor packets use on its own connector (7 px either side of the line). */
+  labelOnOwnPackets: string[];
   crossings: number;
 }
 
@@ -34,6 +36,9 @@ export const pathOf = (d: CanonicalDocument, e: CanonicalEdge): Point[] =>
     e.direction === "backward" || e.direction === "both",
     e.direction === "forward" || e.direction === "both",
   );
+
+/** Half the height of a request capsule riding a connector (engine packet, size 1). */
+const PACKET_HALF = 7;
 
 const overlap = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -67,6 +72,7 @@ export function routingReport(d: CanonicalDocument): RoutingReport {
     throughNodes: [],
     labelOnNode: [],
     labelOnLabel: [],
+    labelOnOwnPackets: [],
     crossings: 0,
   };
   const routed = d.diagram.edges.filter((e) => e.routing === "orthogonal");
@@ -90,6 +96,20 @@ export function routingReport(d: CanonicalDocument): RoutingReport {
       for (const n of d.diagram.nodes)
         if (overlap(box, n)) out.labelOnNode.push(`${e.id} label on ${n.id}`);
       for (const l of labels) if (overlap(box, l.box)) out.labelOnLabel.push(`${e.id}/${l.id}`);
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1]!;
+        const b = pts[i]!;
+        const corridor = {
+          x: Math.min(a.x, b.x) - PACKET_HALF,
+          y: Math.min(a.y, b.y) - PACKET_HALF,
+          w: Math.abs(a.x - b.x) + 2 * PACKET_HALF,
+          h: Math.abs(a.y - b.y) + 2 * PACKET_HALF,
+        };
+        if (overlap(box, corridor)) {
+          out.labelOnOwnPackets.push(`${e.id} segment ${i}`);
+          break;
+        }
+      }
       labels.push({ id: e.id, box });
     }
   }

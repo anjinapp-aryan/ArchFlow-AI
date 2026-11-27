@@ -100,7 +100,7 @@
         "label": "ALB Health Check",
         "kind": "balancer",
         "x": 1531,
-        "y": 508,
+        "y": 524,
         "w": 188,
         "h": 60
       }
@@ -123,7 +123,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.7023,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e2",
@@ -142,7 +142,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.6212,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e3",
@@ -165,7 +165,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.7255,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e4",
@@ -184,7 +184,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.7624,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e5",
@@ -207,7 +207,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.6875,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e6",
@@ -226,7 +226,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.6884,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e7",
@@ -249,7 +249,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.6157,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e8",
@@ -272,7 +272,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.5976,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e9",
@@ -291,7 +291,7 @@
         ],
         "interaction": "sync_request",
         "labelPos": 0.6886,
-        "labelOffset": 11
+        "labelOffset": -17
       },
       {
         "id": "e10",
@@ -317,8 +317,8 @@
           }
         ],
         "interaction": "monitoring",
-        "labelPos": 0.3875,
-        "labelOffset": 11
+        "labelPos": 0.3202,
+        "labelOffset": 17
       },
       {
         "id": "e11",
@@ -332,11 +332,11 @@
         "waypoints": [
           {
             "x": 1625,
-            "y": 438
+            "y": 446
           },
           {
             "x": 1765,
-            "y": 438
+            "y": 446
           },
           {
             "x": 1765,
@@ -344,8 +344,8 @@
           }
         ],
         "interaction": "monitoring",
-        "labelPos": 0.2636,
-        "labelOffset": 11
+        "labelPos": 0.2312,
+        "labelOffset": 17
       },
       {
         "id": "e12",
@@ -359,11 +359,11 @@
         "waypoints": [
           {
             "x": 1625,
-            "y": 464
+            "y": 480
           },
           {
             "x": 1779,
-            "y": 464
+            "y": 480
           },
           {
             "x": 1779,
@@ -371,8 +371,8 @@
           }
         ],
         "interaction": "monitoring",
-        "labelPos": 0.184,
-        "labelOffset": 11
+        "labelPos": 0.144,
+        "labelOffset": 17
       }
     ],
     "groups": []
@@ -381,7 +381,7 @@
     "id": "synthesized",
     "name": "AWS Application Load Balancer routing (generated)",
     "diagramId": "described",
-    "durationMs": 19800,
+    "durationMs": 17800,
     "flows": [
       {
         "id": "f1",
@@ -410,12 +410,11 @@
         "from": "client",
         "to": "alb-listener-443",
         "edgeId": "e1",
-        "variant": "request",
-        "label": "HTTPS request"
+        "variant": "request"
       },
       {
         "type": "packet",
-        "id": "p29",
+        "id": "p27",
         "t": 500,
         "durationMs": 640,
         "flowId": "f2",
@@ -426,17 +425,17 @@
       },
       {
         "type": "timeout",
-        "id": "t30",
+        "id": "t28",
         "t": 500,
         "durationMs": 1500,
         "flowId": "f2",
         "nodeId": "alb-health-check",
-        "waitingFor": "p29",
+        "waitingFor": "p27",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p32",
+        "id": "p30",
         "t": 650,
         "durationMs": 640,
         "flowId": "f2",
@@ -447,7 +446,7 @@
       },
       {
         "type": "packet",
-        "id": "p35",
+        "id": "p33",
         "t": 800,
         "durationMs": 640,
         "flowId": "f2",
@@ -465,21 +464,20 @@
         "from": "alb-listener-443",
         "to": "rule-engine",
         "edgeId": "e2",
-        "variant": "request",
-        "label": "evaluate rules by priority"
+        "variant": "request"
       },
       {
         "type": "node_state",
-        "id": "s26",
+        "id": "s24",
         "t": 1100,
-        "durationMs": 15600,
+        "durationMs": 13600,
         "flowId": "f1",
         "nodeId": "alb-listener-443",
         "state": "active"
       },
       {
         "type": "node_state",
-        "id": "s34",
+        "id": "s32",
         "t": 1290,
         "durationMs": 900,
         "flowId": "f2",
@@ -489,7 +487,7 @@
       },
       {
         "type": "packet",
-        "id": "p33",
+        "id": "p31",
         "t": 1390,
         "durationMs": 640,
         "flowId": "f2",
@@ -498,11 +496,11 @@
         "edgeId": "e11",
         "variant": "success",
         "label": "healthy",
-        "respondsTo": "p32"
+        "respondsTo": "p30"
       },
       {
         "type": "node_state",
-        "id": "s37",
+        "id": "s35",
         "t": 1440,
         "durationMs": 900,
         "flowId": "f2",
@@ -512,7 +510,7 @@
       },
       {
         "type": "packet",
-        "id": "p36",
+        "id": "p34",
         "t": 1540,
         "durationMs": 640,
         "flowId": "f2",
@@ -521,7 +519,7 @@
         "edgeId": "e12",
         "variant": "success",
         "label": "healthy",
-        "respondsTo": "p35"
+        "respondsTo": "p33"
       },
       {
         "type": "packet",
@@ -532,21 +530,20 @@
         "from": "rule-engine",
         "to": "auth-tg",
         "edgeId": "e3",
-        "variant": "request",
-        "label": "/auth* or host auth.app"
+        "variant": "request"
       },
       {
         "type": "node_state",
-        "id": "s24",
+        "id": "s22",
         "t": 1900,
-        "durationMs": 13800,
+        "durationMs": 11800,
         "flowId": "f1",
         "nodeId": "rule-engine",
         "state": "active"
       },
       {
         "type": "node_state",
-        "id": "s31",
+        "id": "s29",
         "t": 2000,
         "durationMs": 900,
         "flowId": "f2",
@@ -563,8 +560,7 @@
         "from": "auth-tg",
         "to": "auth-service",
         "edgeId": "e6",
-        "variant": "request",
-        "label": "forward healthy target"
+        "variant": "request"
       },
       {
         "type": "node_state",
@@ -612,20 +608,8 @@
       },
       {
         "type": "packet",
-        "id": "p9",
-        "t": 5700,
-        "durationMs": 800,
-        "flowId": "f1",
-        "from": "rule-engine",
-        "to": "api-tg",
-        "edgeId": "e4",
-        "variant": "request",
-        "label": "/api/* path match"
-      },
-      {
-        "type": "packet",
-        "id": "p38",
-        "t": 6166,
+        "id": "p36",
+        "t": 5500,
         "durationMs": 640,
         "flowId": "f3",
         "from": "alb-health-check",
@@ -635,18 +619,18 @@
       },
       {
         "type": "timeout",
-        "id": "t39",
-        "t": 6166,
+        "id": "t37",
+        "t": 5500,
         "durationMs": 1500,
         "flowId": "f3",
         "nodeId": "alb-health-check",
-        "waitingFor": "p38",
+        "waitingFor": "p36",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p41",
-        "t": 6316,
+        "id": "p39",
+        "t": 5650,
         "durationMs": 640,
         "flowId": "f3",
         "from": "alb-health-check",
@@ -656,8 +640,19 @@
       },
       {
         "type": "packet",
-        "id": "p44",
-        "t": 6466,
+        "id": "p9",
+        "t": 5700,
+        "durationMs": 800,
+        "flowId": "f1",
+        "from": "rule-engine",
+        "to": "api-tg",
+        "edgeId": "e4",
+        "variant": "request"
+      },
+      {
+        "type": "packet",
+        "id": "p41",
+        "t": 5800,
         "durationMs": 640,
         "flowId": "f3",
         "from": "alb-health-check",
@@ -667,51 +662,20 @@
       },
       {
         "type": "packet",
-        "id": "p10",
-        "t": 6500,
-        "durationMs": 800,
-        "flowId": "f1",
-        "from": "api-tg",
-        "to": "order-api",
-        "edgeId": "e7",
-        "variant": "request",
-        "label": "round-robin healthy targets"
-      },
-      {
-        "type": "node_state",
-        "id": "s16",
-        "t": 6500,
-        "durationMs": 4400,
-        "flowId": "f1",
-        "nodeId": "api-tg",
-        "state": "active"
-      },
-      {
-        "type": "node_state",
-        "id": "s43",
-        "t": 6956,
-        "durationMs": 900,
-        "flowId": "f3",
-        "nodeId": "payment-api",
-        "state": "success",
-        "label": "healthy"
-      },
-      {
-        "type": "packet",
-        "id": "p42",
-        "t": 7056,
+        "id": "p40",
+        "t": 6390,
         "durationMs": 640,
         "flowId": "f3",
         "from": "payment-api",
         "to": "alb-health-check",
         "edgeId": "e11",
         "variant": "success",
-        "respondsTo": "p41"
+        "respondsTo": "p39"
       },
       {
         "type": "node_state",
-        "id": "s46",
-        "t": 7106,
+        "id": "s43",
+        "t": 6440,
         "durationMs": 900,
         "flowId": "f3",
         "nodeId": "frontend-ecs",
@@ -719,43 +683,51 @@
         "label": "healthy"
       },
       {
+        "type": "note",
+        "id": "n10",
+        "t": 6500,
+        "durationMs": 1600,
+        "flowId": "f1",
+        "text": "Order API skipped: unhealthy",
+        "x": 1588,
+        "y": 178
+      },
+      {
         "type": "packet",
-        "id": "p45",
-        "t": 7206,
+        "id": "p11",
+        "t": 6500,
+        "durationMs": 800,
+        "flowId": "f1",
+        "from": "api-tg",
+        "to": "payment-api",
+        "edgeId": "e8",
+        "variant": "request"
+      },
+      {
+        "type": "node_state",
+        "id": "s14",
+        "t": 6500,
+        "durationMs": 2400,
+        "flowId": "f1",
+        "nodeId": "api-tg",
+        "state": "active"
+      },
+      {
+        "type": "packet",
+        "id": "p42",
+        "t": 6540,
         "durationMs": 640,
         "flowId": "f3",
         "from": "frontend-ecs",
         "to": "alb-health-check",
         "edgeId": "e12",
         "variant": "success",
-        "respondsTo": "p44"
+        "respondsTo": "p41"
       },
       {
         "type": "node_state",
-        "id": "s11",
-        "t": 7300,
-        "durationMs": 600,
-        "flowId": "f1",
-        "nodeId": "order-api",
-        "state": "active"
-      },
-      {
-        "type": "packet",
-        "id": "p12",
-        "t": 7500,
-        "durationMs": 800,
-        "flowId": "f1",
-        "from": "order-api",
-        "to": "api-tg",
-        "edgeId": "e7",
-        "variant": "response",
-        "label": "ok",
-        "respondsTo": "p10"
-      },
-      {
-        "type": "node_state",
-        "id": "s40",
-        "t": 8300,
+        "id": "s38",
+        "t": 7000,
         "durationMs": 900,
         "flowId": "f3",
         "nodeId": "order-api",
@@ -763,21 +735,9 @@
         "label": "unhealthy"
       },
       {
-        "type": "packet",
-        "id": "p13",
-        "t": 8500,
-        "durationMs": 800,
-        "flowId": "f1",
-        "from": "api-tg",
-        "to": "payment-api",
-        "edgeId": "e8",
-        "variant": "request",
-        "label": "round-robin healthy targets"
-      },
-      {
         "type": "node_state",
-        "id": "s14",
-        "t": 9300,
+        "id": "s12",
+        "t": 7300,
         "durationMs": 600,
         "flowId": "f1",
         "nodeId": "payment-api",
@@ -785,8 +745,8 @@
       },
       {
         "type": "packet",
-        "id": "p15",
-        "t": 9500,
+        "id": "p13",
+        "t": 7500,
         "durationMs": 800,
         "flowId": "f1",
         "from": "payment-api",
@@ -794,12 +754,12 @@
         "edgeId": "e8",
         "variant": "response",
         "label": "ok",
-        "respondsTo": "p13"
+        "respondsTo": "p11"
       },
       {
         "type": "packet",
-        "id": "p17",
-        "t": 10500,
+        "id": "p15",
+        "t": 8500,
         "durationMs": 800,
         "flowId": "f1",
         "from": "api-tg",
@@ -811,20 +771,39 @@
       },
       {
         "type": "packet",
-        "id": "p18",
-        "t": 11500,
+        "id": "p16",
+        "t": 9500,
         "durationMs": 800,
         "flowId": "f1",
         "from": "rule-engine",
         "to": "web-tg",
         "edgeId": "e5",
-        "variant": "request",
-        "label": "default rule fallback"
+        "variant": "request"
       },
       {
         "type": "packet",
-        "id": "p47",
-        "t": 11832,
+        "id": "p17",
+        "t": 10300,
+        "durationMs": 800,
+        "flowId": "f1",
+        "from": "web-tg",
+        "to": "frontend-ecs",
+        "edgeId": "e9",
+        "variant": "request"
+      },
+      {
+        "type": "node_state",
+        "id": "s20",
+        "t": 10300,
+        "durationMs": 2400,
+        "flowId": "f1",
+        "nodeId": "web-tg",
+        "state": "active"
+      },
+      {
+        "type": "packet",
+        "id": "p44",
+        "t": 10500,
         "durationMs": 640,
         "flowId": "f4",
         "from": "alb-health-check",
@@ -834,18 +813,18 @@
       },
       {
         "type": "timeout",
-        "id": "t48",
-        "t": 11832,
+        "id": "t45",
+        "t": 10500,
         "durationMs": 1500,
         "flowId": "f4",
         "nodeId": "alb-health-check",
-        "waitingFor": "p47",
+        "waitingFor": "p44",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p50",
-        "t": 11982,
+        "id": "p47",
+        "t": 10650,
         "durationMs": 640,
         "flowId": "f4",
         "from": "alb-health-check",
@@ -855,8 +834,8 @@
       },
       {
         "type": "packet",
-        "id": "p53",
-        "t": 12132,
+        "id": "p50",
+        "t": 10800,
         "durationMs": 640,
         "flowId": "f4",
         "from": "alb-health-check",
@@ -865,30 +844,18 @@
         "variant": "probe"
       },
       {
-        "type": "packet",
-        "id": "p19",
-        "t": 12300,
-        "durationMs": 800,
-        "flowId": "f1",
-        "from": "web-tg",
-        "to": "frontend-ecs",
-        "edgeId": "e9",
-        "variant": "request",
-        "label": "forward healthy target"
-      },
-      {
         "type": "node_state",
-        "id": "s22",
-        "t": 12300,
-        "durationMs": 2400,
+        "id": "s18",
+        "t": 11100,
+        "durationMs": 600,
         "flowId": "f1",
-        "nodeId": "web-tg",
+        "nodeId": "frontend-ecs",
         "state": "active"
       },
       {
         "type": "node_state",
-        "id": "s52",
-        "t": 12622,
+        "id": "s49",
+        "t": 11290,
         "durationMs": 900,
         "flowId": "f4",
         "nodeId": "payment-api",
@@ -897,41 +864,8 @@
       },
       {
         "type": "packet",
-        "id": "p51",
-        "t": 12722,
-        "durationMs": 640,
-        "flowId": "f4",
-        "from": "payment-api",
-        "to": "alb-health-check",
-        "edgeId": "e11",
-        "variant": "success",
-        "respondsTo": "p50"
-      },
-      {
-        "type": "packet",
-        "id": "p54",
-        "t": 12872,
-        "durationMs": 640,
-        "flowId": "f4",
-        "from": "frontend-ecs",
-        "to": "alb-health-check",
-        "edgeId": "e12",
-        "variant": "success",
-        "respondsTo": "p53"
-      },
-      {
-        "type": "node_state",
-        "id": "s20",
-        "t": 13100,
-        "durationMs": 600,
-        "flowId": "f1",
-        "nodeId": "frontend-ecs",
-        "state": "active"
-      },
-      {
-        "type": "packet",
-        "id": "p21",
-        "t": 13300,
+        "id": "p19",
+        "t": 11300,
         "durationMs": 800,
         "flowId": "f1",
         "from": "frontend-ecs",
@@ -939,12 +873,36 @@
         "edgeId": "e9",
         "variant": "response",
         "label": "ok",
-        "respondsTo": "p19"
+        "respondsTo": "p17"
+      },
+      {
+        "type": "packet",
+        "id": "p48",
+        "t": 11390,
+        "durationMs": 640,
+        "flowId": "f4",
+        "from": "payment-api",
+        "to": "alb-health-check",
+        "edgeId": "e11",
+        "variant": "success",
+        "respondsTo": "p47"
+      },
+      {
+        "type": "packet",
+        "id": "p51",
+        "t": 11540,
+        "durationMs": 640,
+        "flowId": "f4",
+        "from": "frontend-ecs",
+        "to": "alb-health-check",
+        "edgeId": "e12",
+        "variant": "success",
+        "respondsTo": "p50"
       },
       {
         "type": "node_state",
-        "id": "s49",
-        "t": 13332,
+        "id": "s46",
+        "t": 12000,
         "durationMs": 900,
         "flowId": "f4",
         "nodeId": "order-api",
@@ -952,9 +910,19 @@
         "label": "unhealthy"
       },
       {
+        "type": "node_state",
+        "id": "s52",
+        "t": 12100,
+        "durationMs": 900,
+        "flowId": "f4",
+        "nodeId": "frontend-ecs",
+        "state": "success",
+        "label": "healthy"
+      },
+      {
         "type": "packet",
-        "id": "p23",
-        "t": 14300,
+        "id": "p21",
+        "t": 12300,
         "durationMs": 800,
         "flowId": "f1",
         "from": "web-tg",
@@ -962,12 +930,12 @@
         "edgeId": "e5",
         "variant": "response",
         "label": "ok",
-        "respondsTo": "p18"
+        "respondsTo": "p16"
       },
       {
         "type": "packet",
-        "id": "p25",
-        "t": 15300,
+        "id": "p23",
+        "t": 13300,
         "durationMs": 800,
         "flowId": "f1",
         "from": "rule-engine",
@@ -979,8 +947,8 @@
       },
       {
         "type": "packet",
-        "id": "p27",
-        "t": 16300,
+        "id": "p25",
+        "t": 14300,
         "durationMs": 800,
         "flowId": "f1",
         "from": "alb-listener-443",
@@ -992,8 +960,8 @@
       },
       {
         "type": "node_state",
-        "id": "s28",
-        "t": 17300,
+        "id": "s26",
+        "t": 15300,
         "durationMs": 1500,
         "flowId": "f1",
         "nodeId": "client",
