@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.png binary
 *.webm binary
+# licence texts are SHA-256 pinned in licenses/MANIFEST.json: keep their bytes exact
+licenses/*.txt -text
