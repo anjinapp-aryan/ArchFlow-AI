@@ -52,18 +52,19 @@ Windows notes:
 
 ## Everyday commands
 
-| Command                                        | What it does                                                                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run typecheck`                            | `tsc --noEmit` over all packages                                                                                                     |
-| `npm run lint`                                 | ESLint (incl. rules banning `eval`/`new Function`) + Prettier check                                                                  |
-| `npm run test:unit`                            | Schema, validator and adapter tests (no browser)                                                                                     |
-| `npm run test:browser`                         | WASM engine integration + golden frames (needs Chrome and `engine:build`; **fails loudly** if either is missing)                     |
-| `npm run golden:update`                        | Rewrite goldens for _this_ environment — review the diff and PNGs before committing                                                  |
-| `npm run web:build` / `web:serve`              | Production build into `apps/web/dist` (CSP headers, licences) / serve it locally with those headers                                  |
-| `npm run demos`                                | Standalone demo pages in `artifacts/demos/`                                                                                          |
-| `npm run corpus:generate` / `importers:report` | Regenerate `fixtures/diagrams` from the corpus spec / re-record importer fidelity results (see `docs/research/IMPORTER_FIDELITY.md`) |
-| `npm run engine:verify`                        | Compare `build/engine/manifest.json` hashes with `engine/expected-hashes.json`                                                       |
-| `npm run licenses:collect` / `licenses:check`  | Regenerate licence texts / scan npm tree against the SPDX allow-list                                                                 |
+| Command                                        | What it does                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                            | `tsc --noEmit` over all packages                                                                                                                                                                                                |
+| `npm run lint`                                 | ESLint (incl. rules banning `eval`/`new Function`) + Prettier check                                                                                                                                                             |
+| `npm run test:unit`                            | Schema, validator and adapter tests (no browser)                                                                                                                                                                                |
+| `npm run test:browser`                         | WASM engine integration + golden frames (needs Chrome and `engine:build`; **fails loudly** if either is missing)                                                                                                                |
+| `npm run golden:update`                        | Rewrite goldens for _this_ environment — review the diff and PNGs before committing                                                                                                                                             |
+| `npm run web:build` / `web:serve`              | Production build into `apps/web/dist` (CSP headers, licences) / serve it locally with those headers                                                                                                                             |
+| `npm run demos`                                | Standalone demo pages in `artifacts/demos/`                                                                                                                                                                                     |
+| `npm run deploy` / `smoke:live`                | Guarded Cloudflare deploy of the web app (Worker `app`, target https://app.archflow-ai.workers.dev; refuses without the dedicated account, see `docs/architecture/DEPLOYMENT.md`) / end-to-end test against `ARCHFLOW_BASE_URL` |
+| `npm run corpus:generate` / `importers:report` | Regenerate `fixtures/diagrams` from the corpus spec / re-record importer fidelity results (see `docs/research/IMPORTER_FIDELITY.md`)                                                                                            |
+| `npm run engine:verify`                        | Compare `build/engine/manifest.json` hashes with `engine/expected-hashes.json`                                                                                                                                                  |
+| `npm run licenses:collect` / `licenses:check`  | Regenerate licence texts / scan npm tree against the SPDX allow-list                                                                                                                                                            |
 
 ## Golden frames
 
