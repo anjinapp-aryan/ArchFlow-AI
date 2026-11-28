@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-ArchFlow AI animates how requests and data travel through an existing architecture diagram (packets along the original connectors, request/response, parallel consumers, failures, retries) with exact playback controls and WebM/MP4 export. Everything runs in the browser; there is no server code.
+ArchFlow AI animates how requests and data travel through an existing architecture diagram (packets along the original connectors, request/response, parallel consumers, failures, retries) with exact playback controls and WebM/MP4 export. Everything runs in the browser. The only server code is the optional local `POST /api/instructions` endpoint (LLM "Convert to Instructions", `packages/llm-instructions`, served by `npm run web:serve` with credentials from the git-ignored `.env.local`; the static production build has no such endpoint).
 
 Response style for chat is set in `AGENTS.md` (terse "caveman" style; same text mirrored into `.cursor/rules`, `.clinerules`, `.windsurf`, `.github/copilot-instructions.md`, `.opencode`). Code, comments, commits and docs are written in normal prose.
 
@@ -74,6 +74,6 @@ The app owns its clock, so play/pause/step/speed are exact and export renders fr
 - No GSAP anywhere.
 - Strict CSP with no inline scripts or inline style attributes (`wasm-unsafe-eval` only). Labels are drawn on canvas, never inserted as HTML.
 - Importers treat input as data: XML DOCTYPE/entities refused, bounded decompression, nothing referenced by a file is fetched. 4 MB file limit.
-- No network requests, storage, cookies or analytics after page load.
+- No network requests, storage, cookies or analytics after page load, except the user-clicked same-origin `POST /api/instructions`. Provider keys stay server-side; never import `@archflow/llm-instructions` from `apps/web/src`. Tests mock the provider; never call a paid API from tests.
 - New npm dependencies must pass `npm run licenses:check` (SPDX allow-list, exceptions in `scripts/license-exceptions.json`); engine-compiled code needs notices in `licenses/` and `THIRD_PARTY_NOTICES.md`.
 - Line endings are LF (`.gitattributes`). On Windows, `scripts/build-engine.mjs` strips `MSYSTEM` itself; paths with spaces are supported.

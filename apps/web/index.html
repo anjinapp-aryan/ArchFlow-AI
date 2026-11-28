@@ -235,6 +235,31 @@
               <option value="">Choose an example…</option>
             </select>
           </label>
+          <div class="field ai-box">
+            <label class="field-label" for="ai-prompt">Explain in one line (AI)</label>
+            <input
+              type="text"
+              id="ai-prompt"
+              maxlength="300"
+              autocomplete="off"
+              spellcheck="true"
+              placeholder="Explain how Redis cache works with Spring Boot."
+            />
+            <div class="ai-actions">
+              <button id="ai-convert" title="Turn the line into editable instructions (Enter)">
+                Convert to Instructions
+              </button>
+              <button
+                id="ai-generate"
+                class="primary"
+                title="Animate the instructions below (Ctrl+Enter)"
+                disabled
+              >
+                Generate Diagram
+              </button>
+            </div>
+            <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
+          </div>
           <div class="field">
             <span class="field-label" id="format-label">Source format</span>
             <div class="seg" role="group" aria-labelledby="format-label">

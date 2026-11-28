@@ -585,6 +585,38 @@ textarea:focus-visible {
 .hint {
   margin-top: 6px;
 }
+.ai-box input {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  min-height: 32px;
+  padding: 5px 10px;
+  cursor: text;
+}
+.ai-box input:focus-visible {
+  border-color: var(--accent);
+}
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ai-status {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ai-status:empty {
+  display: none;
+}
+.ai-status.ok {
+  color: var(--ok);
+}
+.ai-status.error {
+  color: var(--error);
+}
 .pane-actions {
   display: flex;
   flex-wrap: wrap;

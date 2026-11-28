@@ -19,3 +19,8 @@ research/spikes/*/node_modules/
 
 # tesseract.js language data downloaded at runtime by the OCR spike (regenerable, not ours)
 *.traineddata
+
+# local environment (LLM provider credentials for `npm run web:serve`); only .env.example is tracked
+.env
+.env.*
+!.env.example

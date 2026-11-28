@@ -55,7 +55,18 @@ The build:
   - Files are limited to 4 MB.
   - Every importer treats input as data. XML `DOCTYPE`/entities are refused, decompression is bounded, and nothing referenced by a file (URLs, includes, images, Mermaid `click`) is fetched or followed.
   - Labels are drawn on canvas as text, never inserted as HTML.
-- **Privacy:** no analytics, no cookies, no storage, no network requests after the page loads.
+- **Privacy:** no analytics, no cookies, no storage, no network requests after the page loads. The only exception is "Convert to Instructions" (below): when the user clicks it, the typed line is sent to the page's own origin, never anywhere else.
+
+## One line to instructions (AI, local server only)
+
+"Convert to Instructions" turns one line ("Explain how Redis cache works with Spring Boot.") into editable instructions in the Describe syntax (`title:`, `request:`, `A -> B : label`). The user edits them and clicks "Generate Diagram"; from there the normal parser, canonical validator, synthesizer and renderer do all the work.
+
+- The LLM call is server-side: `POST /api/instructions` in `scripts/serve-web.mjs`, implemented in `packages/llm-instructions` (never imported by the browser bundle). Providers are OpenAI-compatible Chat Completions endpoints (Gemini, Groq, NVIDIA), tried in `LLM_PROVIDER_ORDER`, one attempt each, with a per-attempt timeout (`ARCHFLOW_LLM_TIMEOUT_MS`, default 30 s).
+- Configuration lives in ArchFlow's own git-ignored `.env.local` at the repository root (template: `.env.example`); real environment variables override it. Keys only ever appear in the outgoing provider request's `Authorization` header.
+- The reply is untrusted: it must be a closed JSON object (`title`, `request`, `steps[{from,to,label}]`) that passes `validateScenario` (lengths, no syntax characters in names, no line breaks) before it is rendered as instructions. The response to the browser is built from an allow-list of fields (scenario, instructions, provider id, model name).
+- The endpoint accepts only same-host, same-origin `application/json` POSTs of at most 4 KB, one conversion at a time and at most 30 per 10 minutes.
+- The production deployment is static and has no such endpoint; the page then says AI conversion needs the local server. Instructions can always be written by hand.
+- Tests mock the provider (`packages/llm-instructions/test`, `apps/web/test/ai*.test.ts`); CI never calls a paid API.
 
 ## Tests
 

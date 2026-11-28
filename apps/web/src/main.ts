@@ -22,6 +22,7 @@ import { describeIssue, summarizeIssues } from "./diagnostics.ts";
 import { locateIssue, type IssueLocation } from "./locate.ts";
 import type { CanonicalDocument } from "@archflow/canonical-model";
 import { Player } from "./player.ts";
+import { requestInstructions } from "./ai.ts";
 import { SAMPLES, type Sample } from "./samples.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -130,6 +131,10 @@ const ui = {
   startDescribe: $<HTMLButtonElement>("start-describe"),
   startImport: $<HTMLButtonElement>("start-import"),
   startExamples: $<HTMLButtonElement>("start-examples"),
+  aiPrompt: $<HTMLInputElement>("ai-prompt"),
+  aiConvert: $<HTMLButtonElement>("ai-convert"),
+  aiGenerate: $<HTMLButtonElement>("ai-generate"),
+  aiStatus: $<HTMLParagraphElement>("ai-status"),
 };
 
 let kind: SourceKind = "text";
@@ -347,6 +352,46 @@ function userOptions(): UserScenarioOptions {
   }
   if (ui.regenerate.checked) o.regenerate = true;
   return o;
+}
+
+// --- one line -> instructions (AI, through the local server) --------------------------------
+
+function setAiStatus(text: string, level: "" | "ok" | "error" = ""): void {
+  ui.aiStatus.textContent = text;
+  ui.aiStatus.className = `ai-status${level ? ` ${level}` : ""}`;
+}
+
+async function convertLine(): Promise<void> {
+  const line = ui.aiPrompt.value.trim();
+  if (line.length < 3) {
+    setAiStatus(
+      "Type a one-line question first, e.g. “Explain how Redis cache works with Spring Boot.”",
+      "error",
+    );
+    ui.aiPrompt.focus();
+    return;
+  }
+  ui.aiConvert.disabled = true;
+  ui.aiConvert.setAttribute("aria-busy", "true");
+  setAiStatus("Converting…");
+  try {
+    const r = await requestInstructions(line);
+    if (!r.ok) {
+      setAiStatus(r.message, "error");
+      return;
+    }
+    setKind("text");
+    ui.source.value = r.instructions;
+    ui.source.dispatchEvent(new Event("input"));
+    ui.aiGenerate.disabled = false;
+    setAiStatus(
+      `Instructions ready (${r.provider}${r.model ? ` · ${r.model}` : ""}). Edit them below, then Generate Diagram.`,
+      "ok",
+    );
+  } finally {
+    ui.aiConvert.disabled = false;
+    ui.aiConvert.removeAttribute("aria-busy");
+  }
 }
 
 // --- running the pipeline -------------------------------------------------------------------
@@ -1030,6 +1075,18 @@ function wire(): void {
     }
   });
   ui.apply.addEventListener("click", () => void run(userOptions(), true));
+  ui.aiConvert.addEventListener("click", () => void convertLine());
+  ui.aiPrompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) {
+      e.preventDefault();
+      if (!ui.aiConvert.disabled) void convertLine();
+    }
+  });
+  ui.aiGenerate.addEventListener("click", () => {
+    hideWelcome();
+    setKind("text");
+    void run(undefined, false);
+  });
   ui.failPair.addEventListener("change", syncFailureFields);
   const loadFile = async (f: File): Promise<void> => {
     hideWelcome();
