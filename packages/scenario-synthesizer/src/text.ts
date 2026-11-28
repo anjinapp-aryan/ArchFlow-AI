@@ -28,6 +28,15 @@ import type { FailureSpec, SynthesisIssue, SynthesisOptions } from "./synthesize
  *        treated the same way and reported)
  *   Consumer 2 fails calling PostgreSQL and retries twice.
  * Anything not understood is reported as a warning, never guessed.
+ *
+ * Ordered interactions: when a description answers a call explicitly (`A -> B` and later
+ * `B -> A`) or makes the same call twice with different labels, the lines are one request
+ * lifecycle in the order written. Each pair of components then gets one connector, and every
+ * line becomes one animated step on it (`options.sequence`), e.g.
+ *   Spring Boot API -> Redis : GET product:101
+ *   Redis -> Spring Boot API : cache miss          (reply on the same connector)
+ *   Spring Boot API -> Redis : SET product:101     (second call on the same connector)
+ * Descriptions without such lines keep the graph-routing behaviour.
  */
 
 export interface DescriptionResult {
@@ -139,6 +148,8 @@ export function parseDescription(text: string): DescriptionResult {
     stroke: CanonicalEdge["stroke"];
     monitoring?: true;
   }[] = [];
+  /** Every non-monitoring interaction in the order written (before connector de-duplication). */
+  const steps: { from: string; to: string; label?: string; sync: boolean }[] = [];
   let monitoringStatement = false;
   const edge = (
     a: string,
@@ -154,6 +165,13 @@ export function parseDescription(text: string): DescriptionResult {
       });
       return;
     }
+    if (!monitoringStatement)
+      steps.push({
+        from: a,
+        to: b,
+        ...(label ? { label: label.slice(0, LIMITS.maxLabelLength) } : {}),
+        sync: direction === "forward" && stroke === "solid",
+      });
     if (rawEdges.some((e) => e.from === a && e.to === b && (e.label ?? "") === (label ?? "")))
       return;
     rawEdges.push({
@@ -296,6 +314,33 @@ export function parseDescription(text: string): DescriptionResult {
       warnings,
       errors: [{ code: "text.too_many", message: `more than ${LIMITS.maxNodes} components` }],
     };
+
+  // an ordered lifecycle: one connector per pair of components, every line a step on it
+  const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const sequential = steps.some((s, j) =>
+    steps.some(
+      (r, i) =>
+        i < j &&
+        ((s.sync && r.sync && r.from === s.to && r.to === s.from) ||
+          (r.from === s.from && r.to === s.to && (r.label ?? "") !== (s.label ?? ""))),
+    ),
+  );
+  if (sequential) {
+    const seen = new Set<string>();
+    const kept = rawEdges.filter((e) => {
+      if (e.monitoring) return true;
+      const k = pairKey(e.from, e.to);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    rawEdges.splice(0, rawEdges.length, ...kept);
+    options.sequence = steps.map((s) => ({
+      from: labels.get(s.from)!,
+      to: labels.get(s.to)!,
+      ...(s.label ? { label: s.label } : {}),
+    }));
+  }
 
   const ids = new IdMapper("node");
   const idOf = new Map(

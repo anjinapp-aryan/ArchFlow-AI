@@ -3,3 +3,4 @@ export * from "./config.ts";
 export * from "./scenario.ts";
 export * from "./client.ts";
 export * from "./handler.ts";
+export * from "./stats.ts";

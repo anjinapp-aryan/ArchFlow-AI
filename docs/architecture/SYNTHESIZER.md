@@ -53,6 +53,34 @@ Sentences work too, one per line or several per paragraph:
 
 Component kinds are inferred from names: user, client, gateway, load balancer, queue, cache, db, cloud storage, external (for example Stripe). Anything not understood is reported (`text.unrecognised`), never guessed.
 
+### Ordered request lifecycles
+
+When a description answers a call explicitly (`A -> B`, and later `B -> A`, both plain `->`) or makes the same call twice with different labels, its lines are one request lifecycle in the order written (`options.sequence`). The diagram then gets one connector per pair of components, and every line becomes exactly one packet on it, in order. Nothing is added: there are no automatic `ok` responses and no extra hops.
+
+```
+Client -> Spring Boot API : HTTP request
+Spring Boot API -> Redis : GET product:101
+Redis -> Spring Boot API : cache miss               reply on the same connector (respondsTo the GET)
+Spring Boot API -> PostgreSQL : SELECT product
+PostgreSQL -> Spring Boot API : product data        database result
+Spring Boot API -> Redis : SET product:101 with TTL 300s   second call on the Redis connector
+Spring Boot API -> Client : HTTP 200 response       answers the first request
+```
+
+A step that travels back to a component with an unanswered call on that connector is that call's response; every other step is a new call (a cache write nobody answers stays unanswered). Packets differ by shape and variant, not by colour alone:
+
+| Step                                     | Variant  | Shape    |
+| ---------------------------------------- | -------- | -------- |
+| request (ordinary component or database) | request  | capsule  |
+| response                                 | response | dot      |
+| cache operation (GET, SET, TTL)          | request  | diamond  |
+| cache answer (hit, miss)                 | response | diamond  |
+| database result                          | response | square   |
+| asynchronous message                     | event    | envelope |
+| health-check probe                       | probe    | arrow    |
+
+A packet carries its own label unless the connector already shows that same text. `fail:` lines still apply: the failed attempts and the retry play at that step, and the following steps move later. Health checks (`monitor:`) keep their own flows and do not move request steps. Descriptions without replies or repeated calls (the ALB, linear and order-flow fixtures, for example) keep graph routing unchanged.
+
 ## 3. Benchmark (master prompt P1.5)
 
 Inputs:

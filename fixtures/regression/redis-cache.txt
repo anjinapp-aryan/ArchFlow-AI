@@ -1,0 +1,10 @@
+title: Redis Cache with Spring Boot
+request: GET /api/products/101
+
+Client -> Spring Boot API : HTTP request
+Spring Boot API -> Redis : GET product:101
+Redis -> Spring Boot API : cache miss
+Spring Boot API -> PostgreSQL : SELECT product
+PostgreSQL -> Spring Boot API : product data
+Spring Boot API -> Redis : SET product:101 with TTL 300s
+Spring Boot API -> Client : HTTP 200 response

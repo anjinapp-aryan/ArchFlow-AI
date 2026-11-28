@@ -3,6 +3,8 @@
 // Cloudflare Static Assets would (path patterns `/x`, `/dir/*`, `/*`). Local preview and e2e
 // tests only; binds to 127.0.0.1. Usage: node scripts/serve-web.mjs [port]
 //
+// `GET /api/instructions/stats` reports per-provider attempts, success rate and latency of this
+// process (names and numbers only).
 // It also serves `POST /api/instructions` (one line -> architecture instructions through the LLM
 // provider configured in ArchFlow's own `.env.local`). The provider call and its key stay in this
 // process; the static production build has no such endpoint and the page says so.
@@ -13,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import {
   PROMPT_LIMITS,
+  createProviderStats,
   handleInstructionsRequest,
   readLlmConfig,
 } from "../packages/llm-instructions/src/index.ts";
@@ -65,6 +68,7 @@ const RATE = { windowMs: 10 * 60_000, max: 30 };
 
 function apiHandler(port, llm) {
   const config = readLlmConfig(llm.env ?? loadLocalEnv());
+  const stats = createProviderStats();
   let busy = false;
   const recent = [];
   const send = (res, status, body, rules) => {
@@ -78,11 +82,7 @@ function apiHandler(port, llm) {
     res.end(JSON.stringify(body));
   };
   const err = (code, message) => ({ ok: false, code, message });
-  return (req, res, rules) => {
-    if (req.method !== "POST") {
-      res.setHeader("Allow", "POST");
-      return send(res, 405, err("http.method", "Use POST."), rules);
-    }
+  return (req, res, rules, pathname) => {
     // only this page may call it: same host (no DNS rebinding), same origin, JSON (forces a
     // CORS preflight from any other site, which is never answered)
     const host = req.headers.host ?? "";
@@ -91,6 +91,28 @@ function apiHandler(port, llm) {
     const origin = req.headers.origin;
     if (origin !== undefined && origin !== `http://${host}`)
       return send(res, 403, err("http.origin", "Cross-origin requests are refused."), rules);
+    if (pathname === "/api/instructions/stats") {
+      if (req.method !== "GET") {
+        res.setHeader("Allow", "GET");
+        return send(res, 405, err("http.method", "Use GET."), rules);
+      }
+      return send(
+        res,
+        200,
+        {
+          ok: true,
+          configured: config.ok,
+          order: config.ok ? config.config.routes.map((r) => `${r.id}/${r.model}`) : [],
+          timeoutMs: config.ok ? config.config.timeoutMs : null,
+          providers: stats.snapshot(),
+        },
+        rules,
+      );
+    }
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST");
+      return send(res, 405, err("http.method", "Use POST."), rules);
+    }
     if (!/^application\/json\s*(;|$)/i.test(req.headers["content-type"] ?? ""))
       return send(res, 415, err("http.type", "Send application/json."), rules);
     const now = Date.now();
@@ -128,12 +150,16 @@ function apiHandler(port, llm) {
         const r = await handleInstructionsRequest(Buffer.concat(chunks).toString("utf8"), {
           config,
           signal: ctrl.signal,
+          stats,
           ...(llm.fetch ? { fetch: llm.fetch } : {}),
         });
         // one log line: outcome and timing only (never the prompt, the reply or credentials)
+        const tries = (r.body.attempts ?? [])
+          .map((a) => `${a.provider} ${a.outcome} ${a.ms} ms`)
+          .join("; ");
         if (!llm.quiet)
           console.log(
-            `[llm] ${r.status} ${r.body.ok ? `${r.body.provider} ${r.body.model}` : r.body.code} ${Date.now() - started} ms`,
+            `[llm] ${r.status} ${r.body.ok ? `${r.body.provider} ${r.body.model}` : r.body.code} ${Date.now() - started} ms${tries ? ` (${tries})` : ""}`,
           );
         send(res, r.status, r.body, rules);
       } catch {
@@ -158,7 +184,8 @@ export function startServer(port = 0, options = {}) {
   const api = apiHandler(() => server.address().port, options.llm ?? {});
   server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname === "/api/instructions") return api(req, res, rules);
+    if (url.pathname === "/api/instructions" || url.pathname === "/api/instructions/stats")
+      return api(req, res, rules, url.pathname);
     let path;
     try {
       path = decodeURIComponent(url.pathname);

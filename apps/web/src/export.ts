@@ -147,6 +147,15 @@ function withRepairedAvcC(
     : { ...meta, decoderConfig: { ...meta.decoderConfig, description: repaired } };
 }
 
+/** Number of frames an export of `durationMs` at `fps` encodes (both ends included). */
+export function exportFrameCount(durationMs: number, fps: number): number {
+  return Math.max(1, Math.ceil((durationMs / 1000) * fps) + 1);
+}
+/** Engine time of export frame `i`: frames are rendered at exact instants, not in real time. */
+export function exportFrameTime(i: number, durationMs: number, fps: number): number {
+  return Math.min(durationMs, (i * 1000) / fps);
+}
+
 export async function exportVideo(req: ExportRequest): Promise<Blob> {
   const { engine, text, format, width, height, fps, signal, onProgress } = req;
   const info = engine.loaded;
@@ -205,7 +214,7 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
   });
 
   const frameUs = 1_000_000 / fps;
-  const total = Math.max(1, Math.ceil((info.durationMs / 1000) * fps) + 1);
+  const total = exportFrameCount(info.durationMs, fps);
   const framing = {
     width,
     height,
@@ -218,7 +227,7 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
     for (let i = 0; i < total; i++) {
       if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
       if (failure) throw failure;
-      const t = Math.min(info.durationMs, (i * 1000) / fps);
+      const t = exportFrameTime(i, info.durationMs, fps);
       paintFrame(
         ctx,
         engine.frame(t),

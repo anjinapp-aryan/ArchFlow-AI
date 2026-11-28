@@ -143,6 +143,11 @@ describe("Convert to Instructions in the app", () => {
   it("fills editable instructions and generates the animated diagram", async () => {
     await page.evaluate(() => (document.querySelector("#welcome-close") as HTMLElement)?.click());
     expect(await page.$eval("#ai-generate", (b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    // an empty editor is filled directly
+    await page.$eval("#source", (t) => {
+      (t as HTMLTextAreaElement).value = "";
+      t.dispatchEvent(new Event("input"));
+    });
     await page.type("#ai-prompt", PROMPT);
     await page.click("#ai-convert");
     await page.waitForFunction(
@@ -167,5 +172,54 @@ describe("Convert to Instructions in the app", () => {
     );
     expect(await page.$eval("#validity", (v) => v.className)).not.toContain("error");
     expect(problems).toEqual([]);
+  });
+
+  it("never overwrites existing instructions without Replace", async () => {
+    const edited = await page.$eval("#source", (t) => (t as HTMLTextAreaElement).value);
+    expect(edited).toContain("TTL 600s");
+    const pendingShown = () =>
+      page.waitForFunction(() => !(document.querySelector("#ai-pending") as HTMLElement).hidden, {
+        timeout: 15_000,
+      });
+    const source = () => page.$eval("#source", (t) => (t as HTMLTextAreaElement).value);
+
+    // Cancel keeps the user's text and discards the result
+    await page.click("#ai-convert");
+    await pendingShown();
+    expect(await source()).toBe(edited);
+    expect(await page.$eval("#ai-preview", (p) => p.textContent)).toBe(REDIS_INSTRUCTIONS);
+    await page.click("#ai-cancel");
+    expect(await page.$eval("#ai-pending", (p) => (p as HTMLElement).hidden)).toBe(true);
+    expect(await source()).toBe(edited);
+    expect(await page.$eval("#ai-status", (p) => p.textContent)).toMatch(/Kept your instructions/);
+
+    // the result is kept until accepted; Replace then puts it in the editor
+    await page.click("#ai-convert");
+    await pendingShown();
+    expect(await source()).toBe(edited);
+    await page.click("#ai-replace");
+    expect(await source()).toBe(REDIS_INSTRUCTIONS);
+    expect(await page.$eval("#ai-pending", (p) => (p as HTMLElement).hidden)).toBe(true);
+    expect(await page.$eval("#ai-status", (p) => p.className)).toContain("ok");
+    expect(problems).toEqual([]);
+  });
+
+  it("reports provider statistics without credentials", async () => {
+    const r = await fetch(`${base}api/instructions/stats`);
+    expect(r.status).toBe(200);
+    const text = await r.text();
+    for (const k of Object.values(FAKE_KEYS)) expect(text).not.toContain(k);
+    const body = JSON.parse(text) as {
+      order: string[];
+      providers: { provider: string; ok: number; successRate: number }[];
+    };
+    expect(body.order).toEqual([
+      "gemini/gemini-test-model",
+      "groq/groq-test-model",
+      "nvidia/nvidia-test-model",
+    ]);
+    const gemini = body.providers.find((p) => p.provider === "gemini")!;
+    expect(gemini.ok).toBe(providerCalls.length);
+    expect(gemini.successRate).toBe(1);
   });
 });

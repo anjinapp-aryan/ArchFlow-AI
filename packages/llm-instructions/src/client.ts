@@ -27,6 +27,8 @@ export interface Attempt {
   outcome: AttemptOutcome;
   /** HTTP status or validation summary; never contains credentials or the provider's body. */
   detail?: string;
+  /** Wall time of the attempt. */
+  ms: number;
 }
 
 export type ConvertResult =
@@ -86,6 +88,21 @@ const outcomeText: Record<AttemptOutcome, string> = {
   network_error: "unreachable",
   bad_reply: "unusable reply",
 };
+
+/** "gemini: timed out after 30 s; groq: rate limited (HTTP 429)" - for people, no secrets. */
+export function describeAttempts(attempts: readonly Attempt[], timeoutMs: number): string {
+  return attempts
+    .map((a) => {
+      const what =
+        a.outcome === "timeout"
+          ? `timed out after ${Math.round(timeoutMs / 1000)} s`
+          : a.outcome === "ok"
+            ? `answered in ${(a.ms / 1000).toFixed(1)} s`
+            : outcomeText[a.outcome];
+      return `${a.provider}: ${what}${a.detail ? ` (${a.detail})` : ""}`;
+    })
+    .join("; ");
+}
 
 /** Defence in depth: no message leaving this package may contain a configured key. */
 export function redact(text: string, config: LlmConfig): string {
@@ -153,15 +170,18 @@ async function attempt(
 export async function convertToInstructions(
   prompt: string,
   config: LlmConfig,
-  options: { fetch?: FetchLike; signal?: AbortSignal } = {},
+  options: { fetch?: FetchLike; signal?: AbortSignal; now?: () => number } = {},
 ): Promise<ConvertResult> {
   const fetchImpl = options.fetch ?? (globalThis.fetch as unknown as FetchLike);
+  const now = options.now ?? Date.now;
   const attempts: Attempt[] = [];
   for (const route of config.routes) {
     if (options.signal?.aborted) break;
+    const t0 = now();
     const r = await attempt(route, prompt, config.timeoutMs, fetchImpl, options.signal);
+    const ms = Math.max(0, Math.round(now() - t0));
     if (r.ok) {
-      attempts.push({ provider: route.id, model: route.model, outcome: "ok" });
+      attempts.push({ provider: route.id, model: route.model, outcome: "ok", ms });
       return {
         ok: true,
         scenario: r.scenario,
@@ -176,12 +196,11 @@ export async function convertToInstructions(
       model: route.model,
       outcome: r.outcome,
       ...(r.detail ? { detail: redact(r.detail, config) } : {}),
+      ms,
     });
   }
   const allTimedOut = attempts.length > 0 && attempts.every((a) => a.outcome === "timeout");
-  const summary = attempts
-    .map((a) => `${a.provider}: ${outcomeText[a.outcome]}${a.detail ? ` (${a.detail})` : ""}`)
-    .join("; ");
+  const summary = describeAttempts(attempts, config.timeoutMs);
   return {
     ok: false,
     code: allTimedOut ? "llm.timeout" : "llm.unavailable",

@@ -33,8 +33,53 @@ import { NOTE_H, diagramBox, noteObstacles, noteWidth, placeNote } from "./notes
  *   matches the request (`request` option), else the default rule; balancers (load balancers,
  *   target groups, "round-robin" connectors) pick the next healthy target.
  * - Explicit `response` connectors carry the responses of the call they answer.
+ * - Ordered steps (`sequence`, from a description that answers its calls explicitly) replace
+ *   graph routing for the request: exactly the written steps play, one after another, each on
+ *   the connector between its two components. A step that travels back to a component with an
+ *   unanswered call on that connector is that call's response (`respondsTo`); every other step
+ *   is a new call. Nothing is added: no automatic "ok" responses, no extra hops. Cache and
+ *   database steps get their own packet shapes (see `stepLook`). Health checks stay independent.
  * - No randomness, no clock: same diagram + options = same scenario.
  */
+
+/** One written interaction of an ordered request lifecycle. */
+export interface SequenceStep {
+  /** Sender: node id or label. */
+  from: string;
+  /** Receiver: node id or label. */
+  to: string;
+  label?: string;
+}
+
+/** Packet kinds of ordered steps, each with its own shape so they never differ by colour alone. */
+export type StepKind = "request" | "response" | "cache" | "cache_reply" | "db_result" | "message";
+
+/**
+ * Variant and shape per step kind:
+ *   request       request,  capsule    call to an ordinary component or a database
+ *   response      response, dot        reply from an ordinary component
+ *   cache         request,  diamond    call into a cache (GET, SET with TTL, ...)
+ *   cache_reply   response, diamond    answer from a cache (hit, miss)
+ *   db_result     response, square     rows / result from a database
+ *   message       event,    envelope   asynchronous message (queue, dashed connector)
+ * Health-check probes keep their own look (small arrow, no trail).
+ */
+export function stepLook(kind: StepKind): Pick<PacketEvent, "variant" | "shape"> {
+  switch (kind) {
+    case "request":
+      return { variant: "request", shape: "capsule" };
+    case "response":
+      return { variant: "response", shape: "dot" };
+    case "cache":
+      return { variant: "request", shape: "diamond" };
+    case "cache_reply":
+      return { variant: "response", shape: "diamond" };
+    case "db_result":
+      return { variant: "response", shape: "square" };
+    case "message":
+      return { variant: "event", shape: "envelope" };
+  }
+}
 
 export interface FailureSpec {
   /** Caller: node id or label. */
@@ -62,6 +107,11 @@ export interface SynthesisOptions {
    * router takes its default rule (reported).
    */
   request?: string;
+  /**
+   * Ordered steps of one request lifecycle. When given, the request traffic is exactly these
+   * steps in this order (see the rules above); the entry is the first step's sender.
+   */
+  sequence?: SequenceStep[];
 }
 
 /** Connector conditions of a rule router: path patterns, host patterns, default rule. */
@@ -208,8 +258,44 @@ export function synthesizeScenario(
     else if (e.direction === "backward") inbound.add(e.from);
   }
 
+  const MAX_STEPS = 1000;
+  if ((options.sequence?.length ?? 0) > MAX_STEPS)
+    return {
+      ok: false,
+      errors: [{ code: "synth.sequence_too_long", message: `more than ${MAX_STEPS} steps` }],
+    };
+  /** Resolved ordered steps (undefined: graph routing). */
+  const sequence = options.sequence?.length
+    ? options.sequence.map((st, i) => {
+        const a = resolve(st.from, `step ${i + 1} sender`);
+        const b = resolve(st.to, `step ${i + 1} receiver`);
+        const e =
+          a !== undefined && b !== undefined
+            ? edges.find(
+                (x) =>
+                  !isMonitoring(x) &&
+                  ((x.from === a && x.to === b) || (x.from === b && x.to === a)),
+              )
+            : undefined;
+        if (a !== undefined && b !== undefined && !e)
+          errors.push({
+            code: "synth.sequence_no_connector",
+            message: `step ${i + 1}: no connector between "${byId.get(a)!.label}" and "${byId.get(b)!.label}"`,
+          });
+        return { a: a!, b: b!, e: e!, label: st.label };
+      })
+    : undefined;
+  if (errors.length > 0) return { ok: false, errors };
+
   let entry: string | undefined;
-  if (options.entry !== undefined) entry = resolve(options.entry, "entry");
+  if (sequence) {
+    entry = sequence[0]!.a;
+    if (options.entry !== undefined && resolve(options.entry, "entry") !== entry)
+      warnings.push({
+        code: "synth.sequence_entry",
+        message: `the steps start at "${byId.get(entry)!.label}"; the chosen entry is ignored`,
+      });
+  } else if (options.entry !== undefined) entry = resolve(options.entry, "entry");
   else
     entry =
       nodes.find((n) => (n.kind === "user" || n.kind === "client") && hops.has(n.id))?.id ??
@@ -470,6 +556,46 @@ export function synthesizeScenario(
     flow: string,
     path: Set<string>,
   ): number => {
+    const { attemptStart, previous } = failedAttempts(a, b, e, t, flow);
+    const req = packet({
+      t: attemptStart,
+      from: a,
+      to: b,
+      edgeId: e.id,
+      variant: previous ? "retry" : "request",
+      ...(previous ? { label: "retry" } : packetLabel(e, "request")),
+      flowId: flow,
+      ...(previous ? { attempt: (previous.attempt ?? 1) + 1, retryOf: previous.id } : {}),
+    });
+    const arrive = req.t + packetMs;
+    const done = visit(b, arrive, flow, new Set([...path, b]));
+    const respondAt = Math.max(done, arrive + gapMs);
+    active(b, arrive, respondAt + (responses ? packetMs / 2 : 0), flow);
+    if (!responses) return respondAt;
+    packet({
+      t: respondAt,
+      from: b,
+      to: a,
+      edgeId: responseEdge(a, b, e),
+      variant: "response",
+      label: "ok",
+      flowId: flow,
+      respondsTo: req.id,
+    });
+    return respondAt + packetMs + gapMs;
+  };
+
+  /**
+   * An injected failure on the call a -> b (once): failed attempts from t, the caller warning
+   * meanwhile. Returns when the successful attempt starts, and the last failed packet.
+   */
+  const failedAttempts = (
+    a: string,
+    b: string,
+    e: CanonicalEdge,
+    t: number,
+    flow: string,
+  ): { attemptStart: number; previous: PacketEvent | undefined } => {
     const fail = failures.get(`${a}>${b}`);
     let attemptStart = t;
     let previous: PacketEvent | undefined;
@@ -525,32 +651,69 @@ export function synthesizeScenario(
         label: "retrying",
       });
     }
-    const req = packet({
-      t: attemptStart,
-      from: a,
-      to: b,
-      edgeId: e.id,
-      variant: previous ? "retry" : "request",
-      ...(previous ? { label: "retry" } : packetLabel(e, "request")),
-      flowId: flow,
-      ...(previous ? { attempt: (previous.attempt ?? 1) + 1, retryOf: previous.id } : {}),
-    });
-    const arrive = req.t + packetMs;
-    const done = visit(b, arrive, flow, new Set([...path, b]));
-    const respondAt = Math.max(done, arrive + gapMs);
-    active(b, arrive, respondAt + (responses ? packetMs / 2 : 0), flow);
-    if (!responses) return respondAt;
-    packet({
-      t: respondAt,
-      from: b,
-      to: a,
-      edgeId: responseEdge(a, b, e),
-      variant: "response",
-      label: "ok",
-      flowId: flow,
-      respondsTo: req.id,
-    });
-    return respondAt + packetMs + gapMs;
+    return { attemptStart, previous };
+  };
+
+  /**
+   * Ordered steps: each written interaction becomes exactly one packet (after any injected
+   * failed attempts), in order, on the connector between its components. Returns when the last
+   * one has arrived.
+   */
+  const playSequence = (t0: number, flow: string): number => {
+    /** Unanswered calls per direction `a>b`, most recent last. */
+    const open = new Map<string, PacketEvent[]>();
+    const kindOf = (a: string, b: string, e: CanonicalEdge, reply: boolean): StepKind => {
+      if (isAsync(a, b, e)) return "message";
+      const from = byId.get(a)!;
+      if (reply)
+        return from.kind === "cache"
+          ? "cache_reply"
+          : from.kind === "db"
+            ? "db_result"
+            : "response";
+      return byId.get(b)!.kind === "cache" ? "cache" : "request";
+    };
+    const busy: [string, number, number][] = [];
+    let cur = t0;
+    for (const { a, b, e, label } of sequence!) {
+      if (packetCount > MAX_PACKETS || cur > TIME_CAP_MS) {
+        truncated = true;
+        break;
+      }
+      const async = isAsync(a, b, e);
+      const answers = async ? undefined : open.get(`${b}>${a}`)?.pop();
+      const kind = kindOf(a, b, e, answers !== undefined);
+      const { attemptStart, previous } = answers
+        ? { attemptStart: cur, previous: undefined }
+        : failedAttempts(a, b, e, cur, flow);
+      const p = packet({
+        t: attemptStart,
+        from: a,
+        to: b,
+        edgeId: e.id,
+        ...stepLook(kind),
+        ...(previous ? { variant: "retry" as const } : {}),
+        // the packet names its step unless the connector already shows that very label
+        ...(previous
+          ? { label: "retry" }
+          : label !== undefined && label !== e.label
+            ? { label }
+            : {}),
+        flowId: flow,
+        ...(answers ? { respondsTo: answers.id } : {}),
+        ...(previous ? { attempt: (previous.attempt ?? 1) + 1, retryOf: previous.id } : {}),
+      });
+      if (!answers && !async) open.set(`${a}>${b}`, [...(open.get(`${a}>${b}`) ?? []), p]);
+      reached.add(a);
+      reached.add(b);
+      const arrive = p.t + packetMs;
+      // the receiver works on it (the entry only receives its answer: it ends with success)
+      if (b !== entry) busy.push([b, arrive, arrive + gapMs + packetMs / 2]);
+      cur = arrive + gapMs;
+    }
+    // after the loop: `active` leaves out the warnings of failed attempts recorded meanwhile
+    for (const [n, t1, t2] of busy) active(n, t1, t2, flow);
+    return cur;
   };
 
   const start = 300;
@@ -596,7 +759,9 @@ export function synthesizeScenario(
     `${byId.get(entry!)!.label} request${options.request ? ` ${options.request}` : ""}`,
   );
   if (options.request) note(options.request.slice(0, 500), start, 1600, mainFlow, byId.get(entry!));
-  const end = visit(entry!, start, mainFlow, new Set([entry!]));
+  const end = sequence
+    ? playSequence(start, mainFlow)
+    : visit(entry!, start, mainFlow, new Set([entry!]));
   if (truncated)
     warnings.push({
       code: "synth.truncated",

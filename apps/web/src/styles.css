@@ -617,6 +617,24 @@ textarea:focus-visible {
 .ai-status.error {
   color: var(--error);
 }
+.ai-pending {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.ai-pending[hidden] {
+  display: none;
+}
+.ai-preview {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre;
+  color: var(--ink-2);
+}
 .pane-actions {
   display: flex;
   flex-wrap: wrap;

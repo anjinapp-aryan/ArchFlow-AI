@@ -22,7 +22,7 @@ import { describeIssue, summarizeIssues } from "./diagnostics.ts";
 import { locateIssue, type IssueLocation } from "./locate.ts";
 import type { CanonicalDocument } from "@archflow/canonical-model";
 import { Player } from "./player.ts";
-import { requestInstructions } from "./ai.ts";
+import { needsReplaceConfirmation, progressText, requestInstructions } from "./ai.ts";
 import { SAMPLES, type Sample } from "./samples.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -135,6 +135,10 @@ const ui = {
   aiConvert: $<HTMLButtonElement>("ai-convert"),
   aiGenerate: $<HTMLButtonElement>("ai-generate"),
   aiStatus: $<HTMLParagraphElement>("ai-status"),
+  aiPending: $<HTMLDivElement>("ai-pending"),
+  aiPreview: $<HTMLPreElement>("ai-preview"),
+  aiReplace: $<HTMLButtonElement>("ai-replace"),
+  aiCancel: $<HTMLButtonElement>("ai-cancel"),
 };
 
 let kind: SourceKind = "text";
@@ -361,6 +365,23 @@ function setAiStatus(text: string, level: "" | "ok" | "error" = ""): void {
   ui.aiStatus.className = `ai-status${level ? ` ${level}` : ""}`;
 }
 
+/** Generated instructions waiting for the user to accept them (the editor had content). */
+let pendingInstructions: { text: string; ready: string } | undefined;
+
+function applyInstructions(text: string, ready: string): void {
+  setKind("text");
+  ui.source.value = text;
+  ui.source.dispatchEvent(new Event("input"));
+  ui.aiGenerate.disabled = false;
+  setAiStatus(ready, "ok");
+}
+
+function setPending(p: typeof pendingInstructions): void {
+  pendingInstructions = p;
+  ui.aiPending.hidden = !p;
+  ui.aiPreview.textContent = p?.text ?? "";
+}
+
 async function convertLine(): Promise<void> {
   const line = ui.aiPrompt.value.trim();
   if (line.length < 3) {
@@ -373,22 +394,29 @@ async function convertLine(): Promise<void> {
   }
   ui.aiConvert.disabled = true;
   ui.aiConvert.setAttribute("aria-busy", "true");
-  setAiStatus("Converting…");
+  const t0 = performance.now();
+  setAiStatus(progressText(0));
+  const tick = setInterval(() => setAiStatus(progressText(performance.now() - t0)), 1000);
   try {
     const r = await requestInstructions(line);
+    clearInterval(tick);
     if (!r.ok) {
       setAiStatus(r.message, "error");
       return;
     }
-    setKind("text");
-    ui.source.value = r.instructions;
-    ui.source.dispatchEvent(new Event("input"));
-    ui.aiGenerate.disabled = false;
-    setAiStatus(
-      `Instructions ready (${r.provider}${r.model ? ` · ${r.model}` : ""}). Edit them below, then Generate Diagram.`,
-      "ok",
-    );
+    const via = `${r.provider}${r.model ? ` · ${r.model}` : ""}`;
+    const ready = `Instructions ready (${via}${r.progress.includes(";") ? `; ${r.progress}` : ""}). Edit them below, then Generate Diagram.`;
+    if (needsReplaceConfirmation(ui.source.value, r.instructions)) {
+      // never overwrite the user's text silently: keep the result until Replace or Cancel
+      setPending({ text: r.instructions, ready });
+      setAiStatus(`Instructions ready (${via}). The editor already has content: replace it?`);
+      ui.aiReplace.focus();
+      return;
+    }
+    setPending(undefined);
+    applyInstructions(r.instructions, ready);
   } finally {
+    clearInterval(tick);
     ui.aiConvert.disabled = false;
     ui.aiConvert.removeAttribute("aria-busy");
   }
@@ -1081,6 +1109,18 @@ function wire(): void {
       e.preventDefault();
       if (!ui.aiConvert.disabled) void convertLine();
     }
+  });
+  ui.aiReplace.addEventListener("click", () => {
+    const p = pendingInstructions;
+    if (!p) return;
+    setPending(undefined);
+    applyInstructions(p.text, p.ready);
+    ui.source.focus();
+  });
+  ui.aiCancel.addEventListener("click", () => {
+    setPending(undefined);
+    setAiStatus("Kept your instructions; the generated ones were discarded.");
+    ui.aiConvert.focus();
   });
   ui.aiGenerate.addEventListener("click", () => {
     hideWelcome();

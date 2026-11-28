@@ -259,6 +259,21 @@
               </button>
             </div>
             <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
+            <div
+              class="ai-pending"
+              id="ai-pending"
+              role="group"
+              aria-label="Generated instructions"
+              hidden
+            >
+              <pre class="ai-preview" id="ai-preview" tabindex="0"></pre>
+              <div class="ai-actions">
+                <button id="ai-replace" class="primary" title="Replace the editor contents">
+                  Replace
+                </button>
+                <button id="ai-cancel" title="Keep the editor contents">Cancel</button>
+              </div>
+            </div>
           </div>
           <div class="field">
             <span class="field-label" id="format-label">Source format</span>

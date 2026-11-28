@@ -65,6 +65,8 @@ The build:
 - Configuration lives in ArchFlow's own git-ignored `.env.local` at the repository root (template: `.env.example`); real environment variables override it. Keys only ever appear in the outgoing provider request's `Authorization` header.
 - The reply is untrusted: it must be a closed JSON object (`title`, `request`, `steps[{from,to,label}]`) that passes `validateScenario` (lengths, no syntax characters in names, no line breaks) before it is rendered as instructions. The response to the browser is built from an allow-list of fields (scenario, instructions, provider id, model name).
 - The endpoint accepts only same-host, same-origin `application/json` POSTs of at most 4 KB, one conversion at a time and at most 30 per 10 minutes.
+- An empty editor is filled directly. If the editor already has content, the result waits in a preview with Replace and Cancel; nothing the user wrote is overwritten without Replace.
+- Progress: the status counts seconds while the server works. The reply lists every provider attempt (provider, model, outcome, milliseconds), and the status names any fallback ("gemini: timed out after 30 s; groq: answered in 1.2 s"). `GET /api/instructions/stats` reports per-provider attempts, success rate and latency for the running server process. The server log has one line per conversion with the same timings. None of these include prompts, replies or credentials.
 - The production deployment is static and has no such endpoint; the page then says AI conversion needs the local server. Instructions can always be written by hand.
 - Tests mock the provider (`packages/llm-instructions/test`, `apps/web/test/ai*.test.ts`); CI never calls a paid API.
 

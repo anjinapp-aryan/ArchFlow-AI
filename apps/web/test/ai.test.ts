@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { readAiResponse, requestInstructions } from "../src/ai.ts";
+import {
+  needsReplaceConfirmation,
+  progressText,
+  readAiResponse,
+  requestInstructions,
+} from "../src/ai.ts";
 
 describe("reading the instructions endpoint's reply", () => {
   it("accepts a well-formed success", () => {
@@ -16,6 +21,7 @@ describe("reading the instructions endpoint's reply", () => {
       title: "T",
       provider: "gemini",
       model: "m",
+      progress: "",
     });
   });
 
@@ -61,5 +67,27 @@ describe("reading the instructions endpoint's reply", () => {
     const fake = (() =>
       Promise.reject(new TypeError("Failed to fetch"))) as unknown as typeof fetch;
     expect((await requestInstructions("x y z", fake)).ok).toBe(false);
+  });
+});
+
+describe("editor overwrite protection", () => {
+  it("fills an empty editor directly", () => {
+    expect(needsReplaceConfirmation("", "title: T\n")).toBe(false);
+    expect(needsReplaceConfirmation("  \n\t", "title: T\n")).toBe(false);
+  });
+  it("asks before replacing anything the user wrote", () => {
+    expect(needsReplaceConfirmation("User -> API", "title: T\n")).toBe(true);
+    expect(needsReplaceConfirmation("graph LR\nA-->B", "title: T\n")).toBe(true);
+  });
+  it("does not ask when the editor already holds exactly this result", () => {
+    expect(needsReplaceConfirmation("title: T\n\nA -> B\n", "title: T\n\nA -> B")).toBe(false);
+  });
+});
+
+describe("conversion progress", () => {
+  it("counts seconds and explains the fallback on long waits", () => {
+    expect(progressText(200)).toBe("Converting…");
+    expect(progressText(3400)).toBe("Converting… 3 s");
+    expect(progressText(31_000)).toMatch(/^Converting… 31 s \(a slow provider falls back/);
   });
 });

@@ -7,11 +7,20 @@
  */
 
 export const AI_ENDPOINT = "/api/instructions";
-export const AI_TIMEOUT_MS = 90_000;
+/** Generous: the server tries up to three providers, each with its own timeout. */
+export const AI_TIMEOUT_MS = 150_000;
 const MAX_INSTRUCTIONS = 8000;
 
 export type AiResult =
-  | { ok: true; instructions: string; title: string; provider: string; model: string }
+  | {
+      ok: true;
+      instructions: string;
+      title: string;
+      provider: string;
+      model: string;
+      /** e.g. "gemini: timed out after 30 s; groq: answered in 1.2 s" (empty when unknown). */
+      progress: string;
+    }
   | { ok: false; message: string };
 
 const NOT_AVAILABLE =
@@ -34,6 +43,7 @@ export function readAiResponse(status: number, data: unknown): AiResult {
         title: short(scenario?.title, 200) ?? "",
         provider: short(body["provider"], 40) ?? "AI",
         model: short(body["model"], 120) ?? "",
+        progress: short(body["progress"], 600) ?? "",
       };
     return { ok: false, message: "The AI service sent an unexpected reply." };
   }
@@ -69,4 +79,21 @@ export async function requestInstructions(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Generated instructions never silently replace what the user wrote: an empty editor (or one
+ * already holding exactly this result) is filled directly, anything else asks first.
+ */
+export function needsReplaceConfirmation(editor: string, generated: string): boolean {
+  const current = editor.trim();
+  return current !== "" && current !== generated.trim();
+}
+
+/** Status line while a conversion runs (the server falls back provider by provider). */
+export function progressText(elapsedMs: number): string {
+  const s = Math.floor(elapsedMs / 1000);
+  return s < 1
+    ? "Converting…"
+    : `Converting… ${s} s${s >= 10 ? " (a slow provider falls back to the next one after its timeout)" : ""}`;
 }

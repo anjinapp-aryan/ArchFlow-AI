@@ -1,6 +1,7 @@
 import type { ConfigResult } from "./config.ts";
-import { convertToInstructions, redact, type FetchLike } from "./client.ts";
+import { convertToInstructions, describeAttempts, redact, type FetchLike } from "./client.ts";
 import type { InstructionScenario } from "./scenario.ts";
+import type { ProviderStats } from "./stats.ts";
 
 /**
  * Framework-free handler for `POST /api/instructions`, shared by the local server and usable
@@ -10,6 +11,14 @@ import type { InstructionScenario } from "./scenario.ts";
 
 export const PROMPT_LIMITS = { min: 3, max: 300, maxBodyBytes: 4096 } as const;
 
+/** What the browser learns about each provider attempt: names, outcome and time only. */
+export interface AttemptSummary {
+  provider: string;
+  model: string;
+  outcome: string;
+  ms: number;
+}
+
 export type InstructionsResponse =
   | {
       ok: true;
@@ -17,8 +26,11 @@ export type InstructionsResponse =
       instructions: string;
       provider: string;
       model: string;
+      attempts: AttemptSummary[];
+      /** Human-readable account of the attempts, e.g. "gemini: timed out after 30 s; groq: answered in 1.2 s". */
+      progress: string;
     }
-  | { ok: false; code: string; message: string };
+  | { ok: false; code: string; message: string; attempts?: AttemptSummary[] };
 
 export interface ApiResponse {
   status: number;
@@ -67,7 +79,13 @@ export function readPrompt(
 
 export async function handleInstructionsRequest(
   rawBody: string,
-  deps: { config: ConfigResult; fetch?: FetchLike; signal?: AbortSignal },
+  deps: {
+    config: ConfigResult;
+    fetch?: FetchLike;
+    signal?: AbortSignal;
+    stats?: ProviderStats;
+    now?: () => number;
+  },
 ): Promise<ApiResponse> {
   const input = readPrompt(rawBody);
   if (!input.ok) return input.response;
@@ -76,9 +94,23 @@ export async function handleInstructionsRequest(
   const r = await convertToInstructions(input.prompt, config, {
     ...(deps.fetch ? { fetch: deps.fetch } : {}),
     ...(deps.signal ? { signal: deps.signal } : {}),
+    ...(deps.now ? { now: deps.now } : {}),
   });
-  if (!r.ok)
-    return response(r.code === "llm.timeout" ? 504 : 502, r.code, redact(r.message, config));
+  deps.stats?.record(r.attempts);
+  const attempts = r.attempts.map((a) => ({
+    provider: a.provider,
+    model: a.model,
+    outcome: a.outcome,
+    ms: a.ms,
+  }));
+  if (!r.ok) {
+    const failed = response(
+      r.code === "llm.timeout" ? 504 : 502,
+      r.code,
+      redact(r.message, config),
+    );
+    return { ...failed, body: { ...failed.body, attempts } as InstructionsResponse };
+  }
   return {
     status: 200,
     body: {
@@ -87,6 +119,8 @@ export async function handleInstructionsRequest(
       instructions: r.instructions,
       provider: r.provider,
       model: r.model,
+      attempts,
+      progress: redact(describeAttempts(r.attempts, config.timeoutMs), config),
     },
   };
 }

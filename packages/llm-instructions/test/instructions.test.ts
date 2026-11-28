@@ -3,6 +3,8 @@ import { textToAnimation } from "@archflow/scenario-synthesizer";
 import {
   DEFAULT_TIMEOUT_MS,
   convertToInstructions,
+  createProviderStats,
+  describeAttempts,
   handleInstructionsRequest,
   parseModelReply,
   readLlmConfig,
@@ -88,11 +90,14 @@ describe("scenario validation and instructions", () => {
       ["Redis", "cache"],
       ["PostgreSQL", "db"],
     ]);
-    expect(r.document.diagram.edges.map((e) => e.label)).toEqual(
-      REDIS_SCENARIO.steps.map((s) => s.label),
-    );
+    // one connector per pair of components; every instruction line is one animated packet
+    expect(r.document.diagram.edges.map((e) => e.label)).toEqual([
+      "HTTP request",
+      "GET product:101",
+      "SELECT product",
+    ]);
     const packets = r.document.scenario!.events.filter((e) => e.type === "packet");
-    expect(packets.length).toBeGreaterThan(4);
+    expect(packets).toHaveLength(REDIS_SCENARIO.steps.length);
     expect(r.document.scenario!.flows[0]!.label).toContain("GET /api/products/101");
   });
 
@@ -217,7 +222,7 @@ describe("HTTP handler (mocked)", () => {
     });
     expect(r.status).toBe(200);
     expect(Object.keys(r.body).sort()).toEqual(
-      ["instructions", "model", "ok", "provider", "scenario"].sort(),
+      ["attempts", "instructions", "model", "ok", "progress", "provider", "scenario"].sort(),
     );
     expect(r.body.ok && r.body.scenario).toEqual(REDIS_SCENARIO);
     expect(r.body.ok && r.body.instructions).toBe(REDIS_INSTRUCTIONS);
@@ -262,5 +267,66 @@ describe("HTTP handler (mocked)", () => {
       fetch: hanging.fetch,
     });
     expect(t.status).toBe(504);
+  });
+});
+
+describe("provider performance (mocked)", () => {
+  /** A clock that advances by the given steps, one per call. */
+  const clock = (...steps: number[]) => {
+    let t = 0;
+    let i = 0;
+    return () => (t += i++ % 2 === 0 ? 0 : (steps[Math.floor(i / 2) - 1] ?? 0));
+  };
+
+  it("times every attempt and keeps the Gemini -> Groq -> NVIDIA order", async () => {
+    const { fetch, calls } = scriptedFetch([
+      { status: 504 },
+      { status: 200, body: completion(JSON.stringify(REDIS_SCENARIO)) },
+    ]);
+    const r = await convertToInstructions(PROMPT, config(), { fetch, now: clock(30_000, 1200) });
+    expect(calls.map((c) => new URL(c.url).host)).toEqual([
+      "generativelanguage.googleapis.com",
+      "api.groq.com",
+    ]);
+    expect(r.attempts.map((a) => [a.provider, a.outcome, a.ms])).toEqual([
+      ["gemini", "timeout", 30_000],
+      ["groq", "ok", 1200],
+    ]);
+    expect(describeAttempts(r.attempts, 30_000)).toBe(
+      "gemini: timed out after 30 s (HTTP 504); groq: answered in 1.2 s",
+    );
+  });
+
+  it("reports progress and attempts to the browser, and records statistics", async () => {
+    const stats = createProviderStats();
+    const deps = (replies: Parameters<typeof scriptedFetch>[0]) => ({
+      config: readLlmConfig(FAKE_ENV),
+      fetch: scriptedFetch(replies).fetch,
+      stats,
+      now: clock(500, 700, 900),
+    });
+    const body = JSON.stringify({ prompt: PROMPT });
+    const good = { status: 200, body: completion(JSON.stringify(REDIS_SCENARIO)) };
+    const a = await handleInstructionsRequest(body, deps([{ status: 429 }, good]));
+    expect(a.body.ok && a.body.progress).toBe(
+      "gemini: rate limited (HTTP 429); groq: answered in 0.7 s",
+    );
+    expect(a.body.ok && a.body.attempts).toEqual([
+      { provider: "gemini", model: "gemini-test-model", outcome: "rate_limited", ms: 500 },
+      { provider: "groq", model: "groq-test-model", outcome: "ok", ms: 700 },
+    ]);
+    await handleInstructionsRequest(body, deps([good]));
+    const failed = await handleInstructionsRequest(
+      body,
+      deps([{ status: 500 }, { status: 500 }, { status: 500 }]),
+    );
+    expect(!failed.body.ok && failed.body.attempts?.length).toBe(3);
+    const snap = Object.fromEntries(stats.snapshot().map((x) => [x.provider, x]));
+    expect(snap["gemini"]).toMatchObject({ attempts: 3, ok: 1, failures: 2, avgOkMs: 500 });
+    expect(snap["gemini"]!.successRate).toBeCloseTo(1 / 3);
+    expect(snap["groq"]).toMatchObject({ attempts: 2, ok: 1, failures: 1, avgOkMs: 700 });
+    expect(snap["nvidia"]).toMatchObject({ attempts: 1, ok: 0, lastOutcome: "http_error" });
+    noKeys(snap);
+    noKeys(failed);
   });
 });
