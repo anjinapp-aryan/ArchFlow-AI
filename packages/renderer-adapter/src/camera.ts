@@ -1,4 +1,5 @@
 import {
+  edgeInteraction,
   enginePath,
   estimateTextWidth,
   pointAlong,
@@ -51,6 +52,18 @@ export interface CameraOptions {
   followZoom: number;
   /** Frame the smallest group containing the focus when it still gains enough zoom. */
   snapToGroups: boolean;
+  /**
+   * Keep the next destination in view: while a request or response travels, the camera also
+   * frames the hop the scenario takes next from its destination (connector and component).
+   */
+  context: boolean;
+  /** Free space kept around the framed content, as a fraction of the view on each side. */
+  safeMargin: number;
+  /**
+   * Never cut a component or a connector label at the frame edge (the frame zooms out or shifts
+   * instead). In dense diagrams this can leave only the overview; off, frames fit the focus.
+   */
+  avoidCuts: boolean;
 }
 
 export const DEFAULT_CAMERA_OPTIONS: Readonly<CameraOptions> = Object.freeze({
@@ -64,6 +77,9 @@ export const DEFAULT_CAMERA_OPTIONS: Readonly<CameraOptions> = Object.freeze({
   followPackets: false,
   followZoom: 1.8,
   snapToGroups: true,
+  context: true,
+  safeMargin: 0.05,
+  avoidCuts: true,
 });
 
 /** Camera state: centre (world) and zoom relative to the overview fit. */
@@ -170,10 +186,11 @@ export function viewRect(plan: Pick<CameraPlan, "overview" | "aspect">, v: Camer
 
 const overviewView = (o: Rect): CameraView => ({ cx: o.x + o.w / 2, cy: o.y + o.h / 2, zoom: 1 });
 
-/** Zoom that fits `r` (clamped to [1, maxZoom]). */
-function fitZoom(r: Rect, o: Rect, aspect: number, maxZoom: number): number {
+/** Zoom that fits `r` with `safe` free space on each side (clamped to [1, maxZoom]). */
+function fitZoom(r: Rect, o: Rect, aspect: number, maxZoom: number, safe = 0): number {
   const b = baseSize(o, aspect);
-  const z = Math.min(b.w / Math.max(1, r.w), b.h / Math.max(1, r.h));
+  const k = 1 + 2 * safe;
+  const z = Math.min(b.w / Math.max(1, r.w * k), b.h / Math.max(1, r.h * k));
   return Math.max(1, Math.min(maxZoom, z));
 }
 
@@ -181,6 +198,8 @@ function fitZoom(r: Rect, o: Rect, aspect: number, maxZoom: number): number {
 
 /** Room above a packet for its label (engine: 16 px above the packet) and the packet itself. */
 const PACKET_ROOM = 30;
+/** A state change is framed this long at its start and at its end. */
+const STATE_CHANGE_MS = 600;
 /** Room around a node for state badges, timers and the activity highlight. */
 const NODE_ROOM = 14;
 
@@ -195,9 +214,81 @@ function edgeFor(
   return edges.find((e) => (e.from === from && e.to === to) || (e.from === to && e.to === from));
 }
 
+/** Engine path of a connector (orthogonal: exact; otherwise the centre line). */
+function edgePath(doc: CanonicalDocument, e: CanonicalEdge): { pts: Point[]; exact: boolean } {
+  const a = doc.diagram.nodes.find((n) => n.id === e.from)!;
+  const b = doc.diagram.nodes.find((n) => n.id === e.to)!;
+  if (e.routing === "orthogonal" && (e.waypoints?.length ?? 0) > 0)
+    return {
+      pts: enginePath(
+        a,
+        b,
+        e.waypoints ?? [],
+        e.direction === "backward" || e.direction === "both",
+        e.direction === "forward" || e.direction === "both",
+      ),
+      exact: true,
+    };
+  return {
+    pts: [
+      { x: a.x + a.w / 2, y: a.y + a.h / 2 },
+      { x: b.x + b.w / 2, y: b.y + b.h / 2 },
+    ],
+    exact: false,
+  };
+}
+
+/** Connector label boxes where ArchFlow anchored them (exact routes only). */
+export function connectorLabelBoxes(doc: CanonicalDocument): Rect[] {
+  const out: Rect[] = [];
+  for (const e of doc.diagram.edges) {
+    if (!e.label || e.labelPos === undefined) continue;
+    const { pts, exact } = edgePath(doc, e);
+    if (!exact) continue;
+    const c = pointAlong(pts, e.labelPos, e.labelOffset ?? 10);
+    const w = estimateTextWidth(e.label) * 0.85 + 12;
+    out.push({ x: c.x - w / 2, y: c.y - 12, w, h: 24 });
+  }
+  return out;
+}
+
+/** Engine note card (Engine/Scene.cpp `_DrawNote`): top-left (x, y), 12.5 px text + 28 px, 30 px high. */
+export const noteCard = (text: string, x: number, y: number): Rect => ({
+  x,
+  y,
+  w: estimateTextWidth(text) * 0.95 + 36,
+  h: 30,
+});
+
 /** Everything that must stay visible, per scenario event (sorted by start, then id). */
-export function cameraActivities(doc: CanonicalDocument): CameraActivity[] {
+export function cameraActivities(doc: CanonicalDocument, context = false): CameraActivity[] {
   const nodes = new Map(doc.diagram.nodes.map((n) => [n.id, n as Rect]));
+  const events = doc.scenario?.events ?? [];
+  /**
+   * The next hop the scenario really takes after packet `ev` arrives: the next request or
+   * response in the same flow that leaves its destination (connector and component).
+   */
+  const nextHop = (ev: Extract<(typeof events)[number], { type: "packet" }>): Rect | undefined => {
+    const arrive = ev.t + ev.durationMs;
+    let next: Extract<(typeof events)[number], { type: "packet" }> | undefined;
+    for (const q of events)
+      if (
+        q.type === "packet" &&
+        q !== ev &&
+        q.variant !== "probe" &&
+        q.from === ev.to &&
+        q.flowId === ev.flowId &&
+        q.t >= arrive - 1 &&
+        (!next || q.t < next.t)
+      )
+        next = q;
+    if (!next) return undefined;
+    const far = nodes.get(next.to);
+    const e = edgeFor(doc, next.from, next.to, next.edgeId);
+    if (!far) return undefined;
+    const box = grow(far, NODE_ROOM);
+    return e ? union(box, grow(ofPoints(edgePath(doc, e).pts), 8)) : box;
+  };
   const out: CameraActivity[] = [];
   const nodeBox = (id: string): Rect | undefined => {
     const n = nodes.get(id);
@@ -254,20 +345,28 @@ export function cameraActivities(doc: CanonicalDocument): CameraActivity[] {
           ),
         );
       }
+      if (context && ev.variant !== "probe" && (!e || edgeInteraction(e) !== "monitoring")) {
+        const c = nextHop(ev);
+        if (c) rect = union(rect, c);
+      }
       out.push({ id: ev.id, t0, t1, rect, nodes: [ev.from, ev.to], ...(follow ? { follow } : {}) });
-    } else if (ev.type === "node_state" || ev.type === "timeout") {
+    } else if (ev.type === "node_state") {
+      // a state matters when it changes: a long state (a caller waiting for its answer, a target
+      // that stays unhealthy) is framed when it starts and when it ends, not all the time
       const r = nodeBox(ev.nodeId);
-      if (r)
-        out.push({
-          id: ev.id,
-          t0,
-          t1,
-          rect: grow(r, ev.type === "timeout" ? 10 : 0),
-          nodes: [ev.nodeId],
-        });
+      if (!r) continue;
+      if (t1 - t0 <= 2 * STATE_CHANGE_MS)
+        out.push({ id: ev.id, t0, t1, rect: r, nodes: [ev.nodeId] });
+      else
+        out.push(
+          { id: ev.id, t0, t1: t0 + STATE_CHANGE_MS, rect: r, nodes: [ev.nodeId] },
+          { id: `${ev.id}~end`, t0: t1 - STATE_CHANGE_MS, t1, rect: r, nodes: [ev.nodeId] },
+        );
+    } else if (ev.type === "timeout") {
+      const r = nodeBox(ev.nodeId);
+      if (r) out.push({ id: ev.id, t0, t1, rect: grow(r, 10), nodes: [ev.nodeId] });
     } else if (ev.type === "note") {
-      const w = estimateTextWidth(ev.text) * 0.85 + 24;
-      out.push({ id: ev.id, t0, t1, rect: { x: ev.x - w / 2, y: ev.y - 16, w, h: 32 }, nodes: [] });
+      out.push({ id: ev.id, t0, t1, rect: noteCard(ev.text, ev.x, ev.y), nodes: [] });
     }
   }
   return out.sort((p, q) => p.t0 - q.t0 || (p.id < q.id ? -1 : p.id > q.id ? 1 : 0));
@@ -341,11 +440,28 @@ export function planCamera(
   const n = doc.diagram.nodes.length;
   if (n <= opt.maxStaticNodes)
     return still(`${n} components (camera only above ${opt.maxStaticNodes})`);
-  const acts = cameraActivities(doc).map((a) => ({
+  const all = cameraActivities(doc, opt.context).map((a) => ({
     ...a,
     rect: clampTo(grow(a.rect, opt.margin), o),
   }));
+  if (all.length === 0) return still("no scenario events");
+  // notes that start after everything else (an ending summary) are shown on the overview
+  const notes = new Set(
+    (doc.scenario?.events ?? []).filter((e) => e.type === "note").map((e) => e.id),
+  );
+  // (states may last to the end, to show the final picture: only traffic counts as work)
+  const states = new Set(
+    (doc.scenario?.events ?? []).filter((e) => e.type === "node_state").map((e) => e.id),
+  );
+  const isWork = (a: CameraActivity): boolean =>
+    !notes.has(a.id) && !states.has(a.id.replace(/~end$/, ""));
+  const workEnd = Math.max(0, ...all.filter(isWork).map((a) => a.t1));
+  const trailing = all.filter((a) => notes.has(a.id) && a.t0 >= workEnd);
+  const endingAt = trailing.length ? Math.min(...trailing.map((a) => a.t0)) : Infinity;
+  // from the ending on, the overview shows everything: nothing after it needs a stop
+  const acts = all.filter((a) => !trailing.includes(a) && a.t0 < endingAt);
   if (acts.length === 0) return still("no scenario events");
+  const summaryAt = endingAt;
 
   const groups = opt.snapToGroups
     ? doc.diagram.groups.flatMap((g) => (g.frame ? [{ id: g.id, rect: g.frame as Rect }] : []))
@@ -359,8 +475,63 @@ export function planCamera(
       .sort((p, q) => p.w * p.h - q.w * q.h);
     return fit[0];
   };
-  const zoomOf = (r: Rect | undefined): number =>
-    r ? fitZoom(frameOf(r) ?? r, o, aspect, opt.maxZoom) : 1;
+  // a frame never cuts a component or a connector label at its edge: whatever it would cut is
+  // taken in whole (the frame zooms out), until nothing is cut
+  const obstacles: Rect[] = [
+    ...doc.diagram.nodes.map((q) => ({ x: q.x, y: q.y, w: q.w, h: q.h })),
+    ...connectorLabelBoxes(doc),
+  ];
+  const cuts = (v: Rect, r: Rect): boolean => {
+    const outside = r.x + r.w <= v.x || r.y + r.h <= v.y || r.x >= v.x + v.w || r.y >= v.y + v.h;
+    return !contains(v, r) && !outside;
+  };
+  const settled = new Map<string, CameraView>();
+  /**
+   * The view for a focus: the highest zoom (from the best fit down, in 3 % steps) and the
+   * nearest centre (shifts of up to 20 % of the view) at which the view shows the focus with the
+   * safe margin and cuts no component and no connector label at its edge. Deterministic: a fixed
+   * search order. Falls back to the overview.
+   */
+  const frameFor = (r: Rect): CameraView => {
+    const key = `${r.x},${r.y},${r.w},${r.h}`;
+    const hit = settled.get(key);
+    if (hit) return hit;
+    const f = frameOf(r) ?? r;
+    const base = baseSize(o, aspect);
+    const shifts = [0, -0.05, 0.05, -0.1, 0.1, -0.15, 0.15, -0.2, 0.2];
+    let found: CameraView = overviewView(o);
+    search: for (
+      let z = fitZoom(f, o, aspect, opt.maxZoom, opt.safeMargin);
+      z > 1.0001;
+      z /= 1.03
+    ) {
+      const w = base.w / z;
+      const h = base.h / z;
+      for (const dx of shifts)
+        for (const dy of shifts) {
+          const v = viewRect(plan, {
+            cx: f.x + f.w / 2 + dx * w,
+            cy: f.y + f.h / 2 + dy * h,
+            zoom: z,
+          });
+          // the safe margin applies where the diagram continues beyond the view; at the
+          // diagram's own edge there is nothing to keep clear of
+          const mx = opt.safeMargin * v.w;
+          const my = opt.safeMargin * v.h;
+          const x0 = v.x <= o.x + 0.5 ? v.x : v.x + mx;
+          const y0 = v.y <= o.y + 0.5 ? v.y : v.y + my;
+          const x1 = v.x + v.w >= o.x + o.w - 0.5 ? v.x + v.w : v.x + v.w - mx;
+          const y1 = v.y + v.h >= o.y + o.h - 0.5 ? v.y + v.h : v.y + v.h - my;
+          const inner = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+          if (!contains(inner, f) || (opt.avoidCuts && obstacles.some((q) => cuts(v, q)))) continue;
+          found = { cx: v.x + v.w / 2, cy: v.y + v.h / 2, zoom: z };
+          break search;
+        }
+    }
+    settled.set(key, found);
+    return found;
+  };
+  const zoomOf = (r: Rect | undefined): number => (r ? frameFor(r).zoom : 1);
 
   const ps = pieces(acts);
   const during = (from: number, to: number): Piece[] => ps.filter((p) => p.t1 > from && p.t0 < to);
@@ -432,7 +603,7 @@ export function planCamera(
     const cur = stops[stops.length - 1]!;
     if (cur.rect === undefined && !cur.follow) break;
     const earliest = (cur.follow ? cur.follow.t1 : cur.arrive + opt.minDwellMs) + opt.moveMs;
-    const latest = durationMs - opt.endHoldMs;
+    const latest = Math.min(durationMs - opt.endHoldMs, summaryAt);
     const arrive = Math.min(latest, Math.max(lastEnd, earliest));
     if (arrive >= earliest) {
       stops.push({ arrive, rect: undefined, nodes: new Set() });
@@ -459,8 +630,7 @@ export function planCamera(
       return { cx: p.x, cy: p.y, zoom: z };
     }
     if (!s.rect) return overviewView(o);
-    const r = frameOf(s.rect) ?? s.rect;
-    return { cx: r.x + r.w / 2, cy: r.y + r.h / 2, zoom: fitZoom(r, o, aspect, opt.maxZoom) };
+    return frameFor(s.rect);
   };
   const focusOf = (s: Stop): string[] => (s.rect || s.follow ? [...s.nodes].sort() : ["overview"]);
 

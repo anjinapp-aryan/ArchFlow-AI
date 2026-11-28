@@ -44,6 +44,14 @@ During a move, the frame's edges are interpolated linearly. Anything visible at 
 | `followPackets` | false | follow a lone packet along its real connector (orthogonal routes, engine easing) |
 | `followZoom` | 1.8 | zoom while following |
 | `snapToGroups` | true | frame the smallest group containing the focus, if it still gains enough zoom |
+| `context` | true | keep the next destination in view: while a request or response travels, also frame the hop the scenario takes next from its destination |
+| `safeMargin` | 0.05 | free space around the focus, as a fraction of the view per side (not at the diagram's own edge) |
+| `avoidCuts` | true | a frame never cuts a component or a connector label at its edge; the planner searches zoom (3 % steps) and centre shifts (up to 20 %) for the highest cut-free frame |
+
+Further rules (AWS ALB quality pass):
+- A long state (a caller waiting for its answer, a target that stays unhealthy) is framed when it starts and when it ends, not for its whole duration.
+- An ending summary (notes after all traffic) is always shown on the overview, from its start to the end.
+- The optional packet-follow mode tracks the packet and is exempt from `avoidCuts`.
 
 **In the app.**
 - **Auto camera** is on by default.
@@ -51,7 +59,7 @@ During a move, the frame's edges are interpolated linearly. Anything visible at 
 - Playback re-plans when the canvas aspect ratio changes.
 - Export plans for the video's aspect ratio. For the same aspect ratio, playback and export get identical bounds at every frame (unit-tested).
 
-**Limitation.** Everything active must stay visible. Diagrams with simultaneous activity across the whole diagram therefore stay mostly on the overview:
+**Limitation.** Everything active must stay visible, and frames must not cut anything. Diagrams with simultaneous activity across the whole diagram therefore stay mostly on the overview:
 - the AWS ALB example: health-check rounds run during the request;
 - broadcasts to many consumers.
 

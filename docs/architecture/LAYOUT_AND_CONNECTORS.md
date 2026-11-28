@@ -42,8 +42,22 @@ Canonical `edge.interaction` (schema minor 2) is either explicit or inferred and
 | --- | --- | --- | --- |
 | `sync_request` | solid, triangle head | none | request capsule; response back on the same connector |
 | `async_message` | dotted | running dashes along the connector while a message travels (engine `link` step) | event envelope |
-| `monitoring` | thin dashed teal, open head | none | `probe`: small teal dot, no trail; answer `success`/`error`; target flashes healthy/unhealthy |
+| `monitoring` | thin dashed teal, open head | none | `probe`: small teal arrow (shows direction), no trail; answer: small diamond, no trail; healthy targets flash "healthy", a failing target stays "unhealthy" |
 | `response` | dashed slate, open head | none | responses of the call it answers |
+
+Packets differ by shape, trail pattern and label, never by colour alone:
+
+| Meaning | Shape | Trail | Label |
+| --- | --- | --- | --- |
+| synchronous request | capsule | solid | connector label, or "request" |
+| response | dot | solid | "ok" |
+| asynchronous message | envelope | dotted | connector label, or "event" |
+| health-check probe | small arrow | none | none (the connector says it) |
+| health answer | small diamond | none | "healthy" / "unhealthy" (first round) |
+| failure | square | dotted | "error" |
+| retry | capsule | dashed | "retry" |
+
+Identical health-check labels of one checker (for example three "GET /health every 30s") are drawn once, on the first such connector (`info.monitoring_labels_merged`). The canonical document keeps every label.
 
 The adapter applies these styles only when `interaction` is set explicitly. Documents without it, such as the existing golden fixtures, render exactly as before.
 

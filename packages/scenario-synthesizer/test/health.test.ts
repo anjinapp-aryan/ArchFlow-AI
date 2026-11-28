@@ -6,6 +6,7 @@ import {
   type PacketEvent,
 } from "@archflow/canonical-model";
 import { parseDescription, synthesizeScenario } from "../src/index.ts";
+import { NOTE_H, noteWidth } from "../src/notes.ts";
 
 /** Health checks: periodic probes on monitoring connectors, never request routing. */
 const ALB = readFileSync(
@@ -106,6 +107,85 @@ describe("health checks", () => {
     expect(packets(plain).some((p) => p.variant === "probe")).toBe(false);
   });
 
+  describe("ending and health states (AWS ALB benchmark)", () => {
+    const end = doc.scenario!.durationMs;
+    const order = doc.diagram.nodes.find((n) => n.label === "Order API")!.id;
+    const client = doc.diagram.nodes.find((n) => n.label === "Client")!.id;
+
+    it("an unhealthy target stays unhealthy until the end (no flashing back to normal)", () => {
+      const down = doc.scenario!.events.filter(
+        (e) => e.type === "node_state" && e.nodeId === order && e.state === "down",
+      );
+      expect(down).toHaveLength(1);
+      expect(down[0]!.t + down[0]!.durationMs).toBe(end);
+      expect(down[0]!.type === "node_state" && down[0]!.label).toBe("unhealthy");
+    });
+
+    it("ends with the entry's final state and a summary that states the outcome in words", () => {
+      const ok = doc.scenario!.events.find(
+        (e) => e.type === "node_state" && e.nodeId === client && e.state === "success",
+      )!;
+      expect(ok.t + ok.durationMs).toBe(end);
+      const summary = doc.scenario!.events.filter((e) => e.type === "note").at(-1)!;
+      if (summary.type !== "note") throw new Error("no summary");
+      expect(summary.text).toMatch(/^✓ Success: Client received its response/);
+      expect(summary.text).toContain("unhealthy: Order API (traffic routed around it)");
+      // it is the last thing that starts, and it lasts to the end
+      expect(Math.max(...doc.scenario!.events.map((e) => e.t))).toBe(summary.t);
+      expect(summary.t + summary.durationMs).toBe(end);
+    });
+
+    it("reports a recovered failure in the summary", () => {
+      const { doc: d } = run("A -> B -> C\nfail: B -> C timeout retries 2\n");
+      const s = d.scenario!.events.filter((e) => e.type === "note").at(-1)!;
+      expect(s.type === "note" && s.text).toMatch(
+        /^✓ Success: A received its response · B → C: timeout, recovered after 2 retries/,
+      );
+    });
+
+    it("an asynchronous-only scenario ends with a delivery summary", () => {
+      const { doc: d } = run("Producer ..> Queue\nQueue ..> Worker\n");
+      const s = d.scenario!.events.filter((e) => e.type === "note").at(-1)!;
+      expect(s.type === "note" && s.text).toMatch(/^✓ Done: every message was delivered/);
+    });
+
+    it("notes cover no component, stay on screen and never overlap each other", () => {
+      const notes = doc.scenario!.events.filter((e) => e.type === "note");
+      const ns = doc.diagram.nodes;
+      const wx = doc.diagram.edges.flatMap((e) => (e.waypoints ?? []).map((p) => p.x));
+      const wy = doc.diagram.edges.flatMap((e) => (e.waypoints ?? []).map((p) => p.y));
+      const box = {
+        x0: Math.min(...ns.map((n) => n.x), ...wx) - 60,
+        y0: Math.min(...ns.map((n) => n.y), ...wy) - 60,
+        x1: Math.max(...ns.map((n) => n.x + n.w), ...wx) + 60,
+        y1: Math.max(...ns.map((n) => n.y + n.h), ...wy) + 60,
+      };
+      const rects = notes.map((n) => {
+        if (n.type !== "note") throw new Error("not a note");
+        return { x: n.x, y: n.y, w: noteWidth(n.text), h: NOTE_H, t0: n.t, t1: n.t + n.durationMs };
+      });
+      expect(rects.length).toBeGreaterThanOrEqual(2);
+      for (const r of rects) {
+        expect(r.x >= box.x0 && r.y >= box.y0 && r.x + r.w <= box.x1 && r.y + r.h <= box.y1).toBe(
+          true,
+        );
+        for (const n of ns)
+          expect(
+            r.x < n.x + n.w && n.x < r.x + r.w && r.y < n.y + n.h && n.y < r.y + r.h,
+            n.id,
+          ).toBe(false);
+      }
+      for (let i = 0; i < rects.length; i++)
+        for (let j = i + 1; j < rects.length; j++) {
+          const a = rects[i]!;
+          const b = rects[j]!;
+          const sameTime = a.t0 < b.t1 && b.t0 < a.t1;
+          const meet = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+          expect(sameTime && meet).toBe(false);
+        }
+    });
+  });
+
   describe("routing around unhealthy targets (phase 2)", () => {
     const { doc } = run(ALB);
     const id = (l: string): string => doc.diagram.nodes.find((n) => n.label === l)!.id;
@@ -128,7 +208,8 @@ describe("health checks", () => {
         (p) => p.from === id("API TG") && p.to === id("Payment API") && p.variant === "request",
       );
       expect(toPayment.length).toBe(1);
-      const notes = doc.scenario!.events.filter((e) => e.type === "note");
+      // the ending summary is a note too; the skip notes are the others
+      const notes = doc.scenario!.events.filter((e) => e.type === "note" && !/^(✓|✗)/.test(e.text));
       expect(notes.map((n) => (n.type === "note" ? n.text : ""))).toEqual([
         "Order API skipped: unhealthy",
       ]);
@@ -144,7 +225,9 @@ describe("health checks", () => {
       );
       const fe = d.diagram.nodes.find((n) => n.label === "Frontend ECS")!.id;
       expect(packets(d).some((p) => p.to === fe && p.variant === "request")).toBe(true);
-      expect(d.scenario!.events.some((e) => e.type === "note")).toBe(false);
+      expect(d.scenario!.events.some((e) => e.type === "note" && e.text.includes("skipped"))).toBe(
+        false,
+      );
     });
 
     it("without a failing health check, every target gets traffic", () => {

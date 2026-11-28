@@ -36,7 +36,7 @@ describe("themes", () => {
       expect(edges.some((e) => e.style.color === t.connectors.monitoring)).toBe(true);
       expect(edges.some((e) => e.style.labelColor === t.connectors.monitoringLabel)).toBe(true);
       const probes = (doc.scenario.steps as { packet?: string; color?: string }[]).filter(
-        (s) => s.packet === "dot",
+        (s) => s.packet === "arrow",
       );
       expect(probes.length).toBeGreaterThan(0);
       for (const p of probes) expect(p.color).toBe(t.connectors.monitoring);

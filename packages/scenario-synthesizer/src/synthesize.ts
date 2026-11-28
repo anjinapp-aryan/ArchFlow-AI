@@ -8,6 +8,7 @@ import {
   type CanonicalNode,
   type PacketEvent,
 } from "@archflow/canonical-model";
+import { NOTE_H, diagramBox, noteObstacles, noteWidth, placeNote } from "./notes.ts";
 
 /**
  * Deterministic scenario synthesizer: diagram -> animation scenario.
@@ -394,18 +395,28 @@ export function synthesizeScenario(
     const known = firstProbeAt(j) + (mode === "timeout" ? timeoutMs : 2 * probeMs + 100);
     unhealthySince.set(dst, Math.min(unhealthySince.get(dst) ?? known, known));
   });
+  const obstacles = noteObstacles(doc);
+  const box = diagramBox(doc);
+  /** Notes already placed, with their time span (a new note avoids those shown at the same time). */
+  const placed: { t0: number; t1: number; r: { x: number; y: number; w: number; h: number } }[] =
+    [];
+  const note = (
+    text: string,
+    t: number,
+    durationMs: number,
+    flow: string,
+    near?: CanonicalNode,
+  ): void => {
+    const taken = placed.filter((q) => q.t0 < t + durationMs && t < q.t1).map((q) => q.r);
+    const at = placeNote(text, near, obstacles, taken, box, doc.diagram.nodes.length);
+    placed.push({ t0: t, t1: t + durationMs, r: { ...at, w: noteWidth(text), h: NOTE_H } });
+    events.push({ type: "note", id: nextId("n"), t, durationMs, flowId: flow, text, ...at });
+  };
+  const skippedTargets = new Set<string>();
   const skipped = (target: string, t: number, flow: string): void => {
     const n = byId.get(target)!;
-    events.push({
-      type: "note",
-      id: nextId("n"),
-      t,
-      durationMs: 1600,
-      flowId: flow,
-      text: `${n.label} skipped: unhealthy`.slice(0, 500),
-      x: n.x,
-      y: Math.max(0, n.y - 34),
-    });
+    skippedTargets.add(target);
+    note(`${n.label} skipped: unhealthy`.slice(0, 500), t, 1600, flow, n);
   };
   const mainFlow = newFlow(`${byId.get(entry!)!.label} request`);
   const end = visit(entry!, start, mainFlow, new Set([entry!]));
@@ -419,7 +430,7 @@ export function synthesizeScenario(
       code: "synth.no_traffic",
       message: `no connector leaves the entry component "${byId.get(entry!)!.label}"`,
     });
-  else if (responses) state(entry!, "success", end, end + 1500, mainFlow);
+  const succeeded = packetCount > 0 && responses && !truncated;
   // --- health checks: periodic probe rounds, independent of request traffic -------------------
   const monitorOnly = new Set(
     nodes
@@ -429,6 +440,9 @@ export function synthesizeScenario(
       })
       .map((n) => n.id),
   );
+  /** First moment each failing target is shown unhealthy (the state then lasts to the end). */
+  const downFrom = new Map<string, { t: number; flow: string }>();
+  let healthFlows = new Set<string>();
   if (monitorEdges.length > 0) {
     const reqEnd = Math.max(end, start + 4000);
     const rounds = Math.max(2, Math.min(4, Math.round((reqEnd - start) / 5000)));
@@ -463,7 +477,7 @@ export function synthesizeScenario(
       }
       return undefined;
     };
-    const healthFlows = new Set<string>();
+    healthFlows = new Set<string>();
     for (let k = 0; k < rounds; k++) {
       const flow = newFlow(`Health check round ${k + 1}`);
       healthFlows.add(flow);
@@ -509,6 +523,14 @@ export function synthesizeScenario(
           });
         }
         const flashAt = mode === "timeout" ? t + timeoutMs : arrive;
+        if (mode) {
+          // an unhealthy target stays unhealthy: one state from the first failed probe onwards
+          if (!downFrom.has(dst)) {
+            const at = freeSlot(dst, flashAt, 900, 1200);
+            if (at !== undefined) downFrom.set(dst, { t: at, flow });
+          }
+          return;
+        }
         const flash = freeSlot(dst, flashAt, 900, 1200);
         if (flash !== undefined)
           events.push({
@@ -524,6 +546,66 @@ export function synthesizeScenario(
       });
     }
     for (const id of monitorOnly) reached.add(id);
+  }
+
+  // --- ending: final states held, and the outcome on the whole diagram -----------------------
+  if (packetCount > 0) {
+    const busyEnd = Math.max(start, ...events.map((e) => e.t + e.durationMs));
+    const summaryAt = busyEnd + 300;
+    const summaryMs = 3600;
+    const finalEnd = summaryAt + summaryMs;
+    const retried = [...failures.entries()].filter(([, f]) => f.used);
+    const parts: string[] = [];
+    const answered = events.some(
+      (e) => e.type === "packet" && e.variant === "response" && e.to === entry,
+    );
+    if (succeeded && answered)
+      parts.push(`✓ Success: ${byId.get(entry!)!.label} received its response`);
+    else if (
+      responses &&
+      !answered &&
+      events.some((e) => e.type === "packet" && e.from === entry && e.variant !== "event")
+    )
+      parts.push(`✗ Failed: ${byId.get(entry!)!.label} received no response`);
+    else parts.push("✓ Done: every message was delivered");
+    if (retried.length > 0)
+      parts.push(
+        retried
+          .map(([k, f]) => {
+            const [a, b] = k.split(">");
+            return `${byId.get(a!)!.label} → ${byId.get(b!)!.label}: ${f.mode}, recovered after ${f.retries} retr${f.retries === 1 ? "y" : "ies"}`;
+          })
+          .join("; "),
+      );
+    const unhealthy = [...downFrom.keys()].map((id) => byId.get(id)!.label);
+    if (unhealthy.length > 0)
+      parts.push(
+        `unhealthy: ${unhealthy.join(", ")}${[...skippedTargets].some((id) => downFrom.has(id)) ? " (traffic routed around it)" : ""}`,
+      );
+    note(parts.join(" · ").slice(0, 500), summaryAt, summaryMs, mainFlow);
+    if (succeeded && answered) state(entry!, "success", end, finalEnd, mainFlow);
+    for (const [id, d] of downFrom) {
+      // until the end, or until the component is used again (fail-open traffic)
+      let until = finalEnd;
+      for (const ev of events) {
+        const touches =
+          (ev.type === "node_state" && ev.nodeId === id) ||
+          (ev.type === "packet" &&
+            !healthFlows.has(ev.flowId ?? "") &&
+            (ev.from === id || ev.to === id));
+        if (touches && ev.t + ev.durationMs > d.t) until = Math.min(until, Math.max(d.t + 1, ev.t));
+      }
+      events.push({
+        type: "node_state",
+        id: nextId("s"),
+        t: d.t,
+        durationMs: Math.max(1, until - d.t),
+        flowId: d.flow,
+        nodeId: id,
+        state: "down",
+        label: "unhealthy",
+      });
+    }
   }
 
   for (const f of failures.values())
@@ -543,7 +625,8 @@ export function synthesizeScenario(
   const last = Math.max(start, ...events.map((e) => e.t + e.durationMs));
   const durationMs = Math.min(
     LIMITS.maxDurationMs,
-    Math.max(1000, Math.ceil((last + 1000) / 100) * 100),
+    // with an ending summary the animation ends with it (the summary holds the last frame)
+    Math.max(1000, Math.ceil((last + (packetCount > 0 ? 0 : 1000)) / 100) * 100),
   );
   if (last > LIMITS.maxDurationMs)
     return {

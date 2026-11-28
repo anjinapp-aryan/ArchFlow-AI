@@ -287,3 +287,60 @@ describe("automatic camera with the real engine", () => {
     );
   });
 });
+
+/** The seven moments of the AWS ALB benchmark, found from the scenario (not hard-coded times). */
+export function albMoments(doc: CanonicalDocument): { label: string; t: number }[] {
+  const ev = doc.scenario!.events;
+  const mid = (p: (typeof ev)[number] | undefined): number =>
+    p ? Math.round(p.t + p.durationMs / 2) : 0;
+  const pkt = (from: string, to?: string, variant?: string) =>
+    ev.find(
+      (e) =>
+        e.type === "packet" &&
+        e.from === from &&
+        (to === undefined || e.to === to) &&
+        (variant === undefined || e.variant === variant),
+    );
+  const down = ev.find((e) => e.type === "node_state" && e.state === "down");
+  return [
+    { label: "1 initial overview", t: 0 },
+    { label: "2 Client → ALB", t: mid(pkt("client", "alb-listener-443")) },
+    { label: "3 ALB → Rule Engine", t: mid(pkt("alb-listener-443", "rule-engine", "request")) },
+    { label: "4 target group selection", t: mid(pkt("rule-engine", "api-tg", "request")) },
+    { label: "5 backend processing", t: mid(pkt("api-tg", "payment-api", "request")) },
+    { label: "6 health-check probes", t: mid(pkt("alb-health-check", "order-api")) },
+    { label: "6b target unhealthy", t: down ? down.t + 300 : 0 },
+    { label: "6c response back to Client", t: mid(pkt("alb-listener-443", "client")) },
+    { label: "7 final overview", t: doc.scenario!.durationMs - 100 },
+  ];
+}
+
+describe("AWS ALB benchmark sheet", () => {
+  it("renders the inspection moments with the automatic camera (artifacts/contact-sheets)", async () => {
+    const doc = fixture("aws-alb.canonical.json");
+    const { json, plan } = await planned(doc);
+    const moments = albMoments(doc);
+    const shots = await paint(
+      json,
+      moments.map((m) => ({ t: m.t, bounds: cameraBoundsAt(plan, m.t) })),
+    );
+    const png = await renderContactSheet(browser, {
+      title: `aws-alb benchmark — ${process.env["ARCHFLOW_SHEET_TAG"] ?? "current"}`,
+      subtitle: `automatic camera, 1280×720 · ${plan.reason}`,
+      frames: shots.map((s, i) => ({
+        t: moments[i]!.t,
+        png: s.png,
+        width: 1280,
+        height: 720,
+        label: `${moments[i]!.label} · t = ${(moments[i]!.t / 1000).toFixed(2)} s`,
+      })),
+      columns: 2,
+      cellWidth: 640,
+    });
+    mkdirSync(sheetDir, { recursive: true });
+    writeFileSync(
+      join(sheetDir, `aws-alb-benchmark-${process.env["ARCHFLOW_SHEET_TAG"] ?? "current"}.png`),
+      png,
+    );
+  });
+});

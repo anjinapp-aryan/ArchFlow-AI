@@ -15,7 +15,7 @@ import {
   type EngineStep,
   type EngineNode,
 } from "./engine-document.ts";
-import { PROBE_PACKET, connectorStyle } from "./connector-style.ts";
+import { PROBE_PACKET, connectorStyle, packetLook } from "./connector-style.ts";
 import { THEMES, type ThemeId } from "./themes.ts";
 import { DIM_HOLD_EFFECT, dimSteps } from "./dim.ts";
 
@@ -156,6 +156,10 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     n.ports.push({ id, dx, dy });
     return id;
   };
+  // health checks from one checker usually share one label ("GET /health every 30s"): draw it
+  // once, on the first such connector, instead of stacking identical copies
+  const shownMonitoringLabels = new Set<string>();
+  let mergedLabels = 0;
   const edges: EngineEdge[] = diagram.edges.map((e) => {
     const none = "none";
     const startHead = e.direction === "backward" || e.direction === "both" ? e.arrowHead : none;
@@ -170,17 +174,25 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
       arrowStart: startHead,
       routing: e.routing,
     };
+    let label = e.label;
+    if (label !== undefined && e.interaction === "monitoring") {
+      const key = `${e.from}\u0000${label}`;
+      if (shownMonitoringLabels.has(key)) {
+        label = undefined;
+        mergedLabels++;
+      } else shownMonitoringLabels.add(key);
+    }
     return {
       id: e.id,
       from: e.from,
       to: e.to,
-      ...(e.label !== undefined ? { label: e.label } : {}),
+      ...(label !== undefined ? { label } : {}),
       ...(e.curve !== undefined ? { curve: e.curve } : {}),
       ...(wps.length > 0 ? { waypoints: wps } : {}),
       ...(fromPort !== undefined ? { fromPort } : {}),
       ...(toPort !== undefined ? { toPort } : {}),
-      ...(e.labelPos !== undefined ? { labelPos: e.labelPos } : {}),
-      ...(e.labelOffset !== undefined ? { labelOff: e.labelOffset } : {}),
+      ...(label !== undefined && e.labelPos !== undefined ? { labelPos: e.labelPos } : {}),
+      ...(label !== undefined && e.labelOffset !== undefined ? { labelOff: e.labelOffset } : {}),
       style:
         e.interaction !== undefined ? connectorStyle(e.interaction, base, theme.connectors) : base,
     };
@@ -198,6 +210,9 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     switch (ev.type) {
       case "packet": {
         const probe = ev.variant === "probe";
+        const onEdge = edgeById.get(ev.edgeId ?? edgeBetween(ev.from, ev.to) ?? "");
+        const look =
+          onEdge?.interaction !== undefined ? packetLook(ev.variant, onEdge.interaction) : {};
         steps.push({
           id: ev.id,
           type: "message",
@@ -215,9 +230,7 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
                 color: theme.connectors.monitoring,
                 trail: PROBE_PACKET.trail,
               }
-            : ev.shape !== undefined
-              ? { packet: ev.shape }
-              : {}),
+            : { ...look, ...(ev.shape !== undefined ? { packet: ev.shape } : {}) }),
           ...(ev.count !== undefined && ev.count > 1 ? { packetCount: ev.count } : {}),
         });
         // an explicitly asynchronous connector shows running dashes while the message travels
@@ -282,6 +295,12 @@ export function adaptValidated(doc: CanonicalDocument, options: AdaptOptions = {
     steps.push(...dimmed);
     steps.sort((a, b) => a.start - b.start);
   }
+  if (mergedLabels > 0)
+    warnings.push({
+      code: "info.monitoring_labels_merged",
+      path: "/diagram/edges",
+      message: `${mergedLabels} identical health-check label(s) drawn once instead of repeated`,
+    });
   if (usedFlow)
     warnings.push({
       code: "info.flow_ids_not_rendered",

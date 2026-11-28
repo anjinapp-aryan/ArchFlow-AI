@@ -47,11 +47,45 @@ export function connectorStyle(
   }
 }
 
-/** Health-check probe packet: small teal dot without a trail. */
+/** Health-check probe packet: small teal arrow (points where it travels), no trail. */
 export const PROBE_PACKET = {
   variant: "request",
-  packet: "dot",
-  packetSize: 0.8,
+  packet: "arrow",
+  packetSize: 0.9,
   color: CONNECTOR_COLORS.monitoring,
   trail: false,
 } as const;
+
+/**
+ * Packet look per meaning, so kinds never differ by colour alone (shape, trail pattern, label):
+ *
+ *   synchronous request   capsule, solid trail                 (engine variant colour)
+ *   response              dot, solid trail, label "ok"
+ *   asynchronous message  envelope, dotted trail (engine "event" variant)
+ *   health-check probe    small arrow, no trail
+ *   health answer         small diamond, no trail, label "healthy" / "unhealthy" on the first round
+ *   failure               square, dotted trail (engine "error" variant), label "error"
+ *   retry                 capsule, dashed trail (engine "retry" variant), label "retry"
+ *
+ * Applied only to documents that state connector interactions explicitly, like the connector
+ * styles, so older documents render exactly as before. An event's own `shape` always wins.
+ */
+export function packetLook(
+  variant: string,
+  interaction: Interaction | undefined,
+): { packet?: string; packetSize?: number; trail?: boolean } {
+  if (interaction === "monitoring")
+    return variant === "success" || variant === "error"
+      ? { packet: "diamond", packetSize: 0.8, trail: false }
+      : {};
+  switch (variant) {
+    case "response":
+      return { packet: "dot" };
+    case "event":
+      return { packet: "envelope" };
+    case "error":
+      return { packet: "square" };
+    default:
+      return {};
+  }
+}

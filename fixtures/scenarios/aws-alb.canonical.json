@@ -381,7 +381,7 @@
     "id": "synthesized",
     "name": "AWS Application Load Balancer routing (generated)",
     "diagramId": "described",
-    "durationMs": 17800,
+    "durationMs": 19000,
     "flows": [
       {
         "id": "f1",
@@ -414,7 +414,7 @@
       },
       {
         "type": "packet",
-        "id": "p27",
+        "id": "p26",
         "t": 500,
         "durationMs": 640,
         "flowId": "f2",
@@ -425,17 +425,17 @@
       },
       {
         "type": "timeout",
-        "id": "t28",
+        "id": "t27",
         "t": 500,
         "durationMs": 1500,
         "flowId": "f2",
         "nodeId": "alb-health-check",
-        "waitingFor": "p27",
+        "waitingFor": "p26",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p30",
+        "id": "p28",
         "t": 650,
         "durationMs": 640,
         "flowId": "f2",
@@ -446,7 +446,7 @@
       },
       {
         "type": "packet",
-        "id": "p33",
+        "id": "p31",
         "t": 800,
         "durationMs": 640,
         "flowId": "f2",
@@ -477,7 +477,7 @@
       },
       {
         "type": "node_state",
-        "id": "s32",
+        "id": "s30",
         "t": 1290,
         "durationMs": 900,
         "flowId": "f2",
@@ -487,7 +487,7 @@
       },
       {
         "type": "packet",
-        "id": "p31",
+        "id": "p29",
         "t": 1390,
         "durationMs": 640,
         "flowId": "f2",
@@ -496,11 +496,11 @@
         "edgeId": "e11",
         "variant": "success",
         "label": "healthy",
-        "respondsTo": "p30"
+        "respondsTo": "p28"
       },
       {
         "type": "node_state",
-        "id": "s35",
+        "id": "s33",
         "t": 1440,
         "durationMs": 900,
         "flowId": "f2",
@@ -510,7 +510,7 @@
       },
       {
         "type": "packet",
-        "id": "p34",
+        "id": "p32",
         "t": 1540,
         "durationMs": 640,
         "flowId": "f2",
@@ -519,7 +519,7 @@
         "edgeId": "e12",
         "variant": "success",
         "label": "healthy",
-        "respondsTo": "p33"
+        "respondsTo": "p31"
       },
       {
         "type": "packet",
@@ -543,9 +543,9 @@
       },
       {
         "type": "node_state",
-        "id": "s29",
+        "id": "s51",
         "t": 2000,
-        "durationMs": 900,
+        "durationMs": 17000,
         "flowId": "f2",
         "nodeId": "order-api",
         "state": "down",
@@ -608,7 +608,7 @@
       },
       {
         "type": "packet",
-        "id": "p36",
+        "id": "p34",
         "t": 5500,
         "durationMs": 640,
         "flowId": "f3",
@@ -619,17 +619,17 @@
       },
       {
         "type": "timeout",
-        "id": "t37",
+        "id": "t35",
         "t": 5500,
         "durationMs": 1500,
         "flowId": "f3",
         "nodeId": "alb-health-check",
-        "waitingFor": "p36",
+        "waitingFor": "p34",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p39",
+        "id": "p36",
         "t": 5650,
         "durationMs": 640,
         "flowId": "f3",
@@ -651,7 +651,7 @@
       },
       {
         "type": "packet",
-        "id": "p41",
+        "id": "p38",
         "t": 5800,
         "durationMs": 640,
         "flowId": "f3",
@@ -662,7 +662,7 @@
       },
       {
         "type": "packet",
-        "id": "p40",
+        "id": "p37",
         "t": 6390,
         "durationMs": 640,
         "flowId": "f3",
@@ -670,11 +670,11 @@
         "to": "alb-health-check",
         "edgeId": "e11",
         "variant": "success",
-        "respondsTo": "p39"
+        "respondsTo": "p36"
       },
       {
         "type": "node_state",
-        "id": "s43",
+        "id": "s40",
         "t": 6440,
         "durationMs": 900,
         "flowId": "f3",
@@ -689,8 +689,8 @@
         "durationMs": 1600,
         "flowId": "f1",
         "text": "Order API skipped: unhealthy",
-        "x": 1588,
-        "y": 178
+        "x": 1348,
+        "y": 102
       },
       {
         "type": "packet",
@@ -714,7 +714,7 @@
       },
       {
         "type": "packet",
-        "id": "p42",
+        "id": "p39",
         "t": 6540,
         "durationMs": 640,
         "flowId": "f3",
@@ -722,17 +722,7 @@
         "to": "alb-health-check",
         "edgeId": "e12",
         "variant": "success",
-        "respondsTo": "p41"
-      },
-      {
-        "type": "node_state",
-        "id": "s38",
-        "t": 7000,
-        "durationMs": 900,
-        "flowId": "f3",
-        "nodeId": "order-api",
-        "state": "down",
-        "label": "unhealthy"
+        "respondsTo": "p38"
       },
       {
         "type": "node_state",
@@ -802,7 +792,7 @@
       },
       {
         "type": "packet",
-        "id": "p44",
+        "id": "p41",
         "t": 10500,
         "durationMs": 640,
         "flowId": "f4",
@@ -813,17 +803,17 @@
       },
       {
         "type": "timeout",
-        "id": "t45",
+        "id": "t42",
         "t": 10500,
         "durationMs": 1500,
         "flowId": "f4",
         "nodeId": "alb-health-check",
-        "waitingFor": "p44",
+        "waitingFor": "p41",
         "label": "no answer"
       },
       {
         "type": "packet",
-        "id": "p47",
+        "id": "p43",
         "t": 10650,
         "durationMs": 640,
         "flowId": "f4",
@@ -834,7 +824,7 @@
       },
       {
         "type": "packet",
-        "id": "p50",
+        "id": "p46",
         "t": 10800,
         "durationMs": 640,
         "flowId": "f4",
@@ -854,7 +844,7 @@
       },
       {
         "type": "node_state",
-        "id": "s49",
+        "id": "s45",
         "t": 11290,
         "durationMs": 900,
         "flowId": "f4",
@@ -877,7 +867,7 @@
       },
       {
         "type": "packet",
-        "id": "p48",
+        "id": "p44",
         "t": 11390,
         "durationMs": 640,
         "flowId": "f4",
@@ -885,11 +875,11 @@
         "to": "alb-health-check",
         "edgeId": "e11",
         "variant": "success",
-        "respondsTo": "p47"
+        "respondsTo": "p43"
       },
       {
         "type": "packet",
-        "id": "p51",
+        "id": "p47",
         "t": 11540,
         "durationMs": 640,
         "flowId": "f4",
@@ -897,21 +887,11 @@
         "to": "alb-health-check",
         "edgeId": "e12",
         "variant": "success",
-        "respondsTo": "p50"
+        "respondsTo": "p46"
       },
       {
         "type": "node_state",
-        "id": "s46",
-        "t": 12000,
-        "durationMs": 900,
-        "flowId": "f4",
-        "nodeId": "order-api",
-        "state": "down",
-        "label": "unhealthy"
-      },
-      {
-        "type": "node_state",
-        "id": "s52",
+        "id": "s48",
         "t": 12100,
         "durationMs": 900,
         "flowId": "f4",
@@ -960,12 +940,22 @@
       },
       {
         "type": "node_state",
-        "id": "s26",
+        "id": "s50",
         "t": 15300,
-        "durationMs": 1500,
+        "durationMs": 3700,
         "flowId": "f1",
         "nodeId": "client",
         "state": "success"
+      },
+      {
+        "type": "note",
+        "id": "n49",
+        "t": 15400,
+        "durationMs": 3600,
+        "flowId": "f1",
+        "text": "✓ Success: Client received its response · unhealthy: Order API (traffic routed around it)",
+        "x": 20,
+        "y": -24
       }
     ]
   }

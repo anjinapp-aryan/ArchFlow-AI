@@ -238,7 +238,7 @@ describe("connector semantics (canonical minor 2)", () => {
     expect(e.get("resp")!.color).not.toBe(e.get("mon")!.color);
   });
 
-  it("draws probes as small teal dots without a trail", () => {
+  it("draws probes as small teal arrows (direction visible) without a trail", () => {
     const d = adapt(
       doc([
         { type: "packet", id: "pr", t: 100, durationMs: 500, from: "m", to: "c", variant: "probe" },
@@ -247,9 +247,103 @@ describe("connector semantics (canonical minor 2)", () => {
     expect(d.scenario.steps[0]).toMatchObject({
       type: "message",
       variant: "request",
-      packet: "dot",
+      packet: "arrow",
       trail: false,
     });
+  });
+
+  it("gives every packet meaning its own shape or trail, not only a colour", () => {
+    const pk = (
+      id: string,
+      from: string,
+      to: string,
+      edgeId: string,
+      variant: string,
+      t: number,
+      extra: Record<string, unknown> = {},
+    ) => ({ type: "packet", id, t, durationMs: 300, from, to, edgeId, variant, ...extra });
+    const d = adapt(
+      doc([
+        pk("rq", "a", "c", "sync", "request", 100),
+        pk("rs", "c", "a", "resp", "response", 500, { respondsTo: "rq" }),
+        pk("ev", "b", "c", "async", "event", 900),
+        pk("pr", "m", "c", "mon", "probe", 1300),
+        pk("ok", "c", "m", "mon", "success", 1700),
+        pk("er", "a", "c", "sync", "error", 2100),
+        pk("rt", "a", "c", "sync", "retry", 2500, { retryOf: "er", attempt: 2 }),
+      ]),
+    );
+    const look = Object.fromEntries(
+      d.scenario.steps
+        .filter((s) => s.type === "message")
+        .map((s) => {
+          const m = s as { id: string; variant: string; packet?: string; trail?: boolean };
+          return [m.id, `${m.packet ?? "capsule"}/${m.trail === false ? "no-trail" : m.variant}`];
+        }),
+    );
+    expect(look).toEqual({
+      rq: "capsule/request", // solid trail
+      rs: "dot/response",
+      ev: "envelope/event", // dotted trail (engine variant)
+      pr: "arrow/no-trail",
+      ok: "diamond/no-trail", // health answer
+      er: "square/error", // dotted trail (engine variant)
+      rt: "capsule/retry", // dashed trail (engine variant)
+    });
+    expect(new Set(Object.values(look)).size).toBe(7);
+  });
+
+  it("an event's own shape wins", () => {
+    const d = adapt(
+      doc([
+        {
+          type: "packet",
+          id: "rq",
+          t: 100,
+          durationMs: 300,
+          from: "a",
+          to: "c",
+          edgeId: "sync",
+          variant: "request",
+        },
+        {
+          type: "packet",
+          id: "rs",
+          t: 500,
+          durationMs: 300,
+          from: "c",
+          to: "a",
+          edgeId: "resp",
+          variant: "response",
+          respondsTo: "rq",
+          shape: "square",
+        },
+      ]),
+    );
+    expect(d.scenario.steps.find((s) => s.id === "rs")).toMatchObject({ packet: "square" });
+  });
+
+  it("draws identical health-check labels of one checker once", () => {
+    const base = doc() as { diagram: { nodes: unknown[]; edges: Record<string, unknown>[] } };
+    base.diagram.nodes.push({
+      id: "d",
+      label: "D",
+      kind: "service",
+      x: 600,
+      y: 300,
+      w: 120,
+      h: 50,
+    });
+    base.diagram.edges = [
+      ...base.diagram.edges.filter((e) => e["id"] !== "mon"),
+      { id: "mon1", from: "m", to: "c", interaction: "monitoring", label: "GET /health" },
+      { id: "mon2", from: "m", to: "d", interaction: "monitoring", label: "GET /health" },
+    ];
+    const r = toEngineDocument(base);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const labels = r.document.edges.filter((e) => e.label === "GET /health").map((e) => e.id);
+    expect(labels).toEqual(["mon1"]);
+    expect(r.warnings.map((w) => w.code)).toContain("info.monitoring_labels_merged");
   });
 
   it("animates an asynchronous connector only while its message travels", () => {
