@@ -82,6 +82,23 @@ async function waitForFile(ext: string, timeoutMs = 90_000): Promise<string> {
   throw new Error(`no ${ext} download`);
 }
 
+/** Export controls live in the export dialog (header "Export" button). */
+async function openExport(): Promise<void> {
+  if (!(await page.$eval("#export-dialog", (d) => (d as HTMLDialogElement).open)))
+    await page.click("#open-export");
+  await page.waitForFunction(
+    () => (document.querySelector("#export-dialog") as HTMLDialogElement).open,
+  );
+}
+async function closeExport(): Promise<void> {
+  await page.$eval("#export-dialog", (d) => (d as HTMLDialogElement).close());
+}
+/** Theme and dimming live in the "Diagram style" popover of the canvas toolbar. */
+async function openViewMenu(): Promise<void> {
+  if (await page.$eval("#view-pop", (e) => (e as HTMLElement).hidden))
+    await page.click("#view-menu");
+}
+
 describe("web app (production build)", () => {
   it("is served with a strict CSP and security headers", async () => {
     const r = await fetch(base);
@@ -149,12 +166,14 @@ describe("web app (production build)", () => {
   it("downloads the validated canonical JSON", async () => {
     await page.select("#examples", "bench-mermaid");
     await new Promise((r) => setTimeout(r, 500));
+    await openExport();
     await page.click("#download-json");
     const f = await waitForFile(".archflow.json");
     expect(parseCanonical(JSON.parse(readFileSync(f, "utf8"))).ok).toBe(true);
   });
 
   it("exports a WebM video rendered on the device", async () => {
+    await openExport();
     await page.select("#size", "1280x720");
     await page.click("#export");
     const f = await waitForFile(".webm");
@@ -173,6 +192,7 @@ describe("web app (production build)", () => {
       (o) => !(o as HTMLOptionElement).disabled,
     );
     if (!mp4) return; // honestly skipped: no H.264 encoder in this browser build
+    await openExport();
     await page.select("#format", "mp4");
     await page.click("#export");
     const f = await waitForFile(".mp4");
@@ -186,6 +206,7 @@ describe("web app (production build)", () => {
   it("auto camera: on by default, frames differ from the overview, a manual zoom switches it off", async () => {
     // the order-flow example zooms (the AWS ALB example now plays on the overview: its single
     // routed request overlaps both health-check rounds, see camera.test.ts)
+    await closeExport();
     await page.select("#examples", "bench-text");
     await page.waitForFunction(
       () => !(document.querySelector("#animate") as HTMLButtonElement).disabled,
@@ -245,10 +266,12 @@ describe("web app (production build)", () => {
       expect(await corner(), theme).toEqual([...bg]);
       expect(await time()).toBe(before);
     }
+    await openViewMenu();
     await page.click("#dim");
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
     expect(await time()).toBe(before);
     await page.click("#dim");
+    await page.click("#view-menu"); // close the popover
     expect(await page.$$eval("#issues li.error", (l) => l.length)).toBe(0);
     expect(problems).toEqual([]);
   }, 120_000);

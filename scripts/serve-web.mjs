@@ -7,7 +7,10 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(fileURLToPath(new URL("../apps/web/dist", import.meta.url)));
+// ARCHFLOW_DIST serves another copy of the build (e.g. a frozen snapshot for long QA runs)
+const root = process.env.ARCHFLOW_DIST
+  ? resolve(process.env.ARCHFLOW_DIST)
+  : resolve(fileURLToPath(new URL("../apps/web/dist", import.meta.url)));
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -42,7 +45,14 @@ export function startServer(port = 0) {
   const rules = parseHeaders(readFileSync(join(root, "_headers"), "utf8"));
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    let path = decodeURIComponent(url.pathname);
+    let path;
+    try {
+      path = decodeURIComponent(url.pathname);
+    } catch {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("bad request");
+      return;
+    }
     const file = normalize(join(root, path === "/" ? "index.html" : path));
     if (
       !file.startsWith(root + sep) ||
@@ -54,7 +64,6 @@ export function startServer(port = 0) {
       res.end("not found");
       return;
     }
-    if (path === "/") path = "/";
     for (const r of rules)
       if (matches(r.pattern, path)) for (const [k, v] of r.headers) res.setHeader(k, v);
     res.setHeader("Content-Type", TYPES[extname(file)] ?? "application/octet-stream");

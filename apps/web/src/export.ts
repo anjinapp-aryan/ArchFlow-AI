@@ -32,7 +32,8 @@ export interface ExportRequest {
 
 const CODECS: Record<VideoFormat, string[]> = {
   webm: ["vp09.00.40.08", "vp09.00.10.08", "vp8"],
-  mp4: ["avc1.640028", "avc1.4d0028", "avc1.42001f"],
+  // level 4.0 first (up to 1080p, unchanged output); level 5.1 for 4K
+  mp4: ["avc1.640028", "avc1.4d0028", "avc1.42001f", "avc1.640033"],
 };
 
 export const webCodecsAvailable = (): boolean =>
@@ -64,8 +65,87 @@ export async function pickCodec(
   return undefined;
 }
 
+/**
+ * Muxer timing for H.264 chunks given in decode order. Some encoders (Firefox) emit B-frames, so
+ * presentation timestamps arrive out of order, and their first timestamp can be one frame late.
+ * Presentation times are taken relative to the first chunk (the I-frame shown first). Decode
+ * times are the sorted presentation times, and every presentation time is delayed just enough
+ * that no frame is shown before it is decoded. Without B-frames the result is the input, with
+ * zero offsets. The first decode time is 0, as the muxer requires.
+ */
+export function h264Timing(
+  timestamps: readonly number[],
+): { timestamp: number; compositionOffset: number }[] {
+  if (timestamps.length === 0) return [];
+  const base = timestamps[0]!;
+  const pts = timestamps.map((t) => t - base);
+  const decode = [...pts].sort((a, b) => a - b);
+  let delay = 0;
+  pts.forEach((t, k) => (delay = Math.max(delay, decode[k]! - t)));
+  return pts.map((t, k) => ({
+    timestamp: t + delay,
+    compositionOffset: t + delay - decode[k]!,
+  }));
+}
+
+/**
+ * Repairs an AVCDecoderConfigurationRecord whose parameter sets repeat their NAL header byte
+ * (Firefox 161 writes `67 67 64 …` for an SPS and `68 68 …` for a PPS). The repeated byte
+ * makes strict players reject the MP4. A well-formed record is returned unchanged.
+ */
+export function repairAvcC(record: Uint8Array): Uint8Array {
+  if (record.length < 7 || record[0] !== 1) return record;
+  const profile = record[1];
+  const out: number[] = [...record.subarray(0, 5)];
+  let at = 5;
+  let fixed = false;
+  const copySets = (count: number, nalType: number): boolean => {
+    for (let n = 0; n < count; n++) {
+      if (at + 2 > record.length) return false;
+      const len = (record[at]! << 8) | record[at + 1]!;
+      const nal = record.subarray(at + 2, at + 2 + len);
+      if (nal.length !== len) return false;
+      at += 2 + len;
+      const doubled =
+        len >= 3 &&
+        nal[0] === nal[1] &&
+        (nal[0]! & 0x1f) === nalType &&
+        (nalType !== 7 || nal[2] === profile) &&
+        (nalType !== 8 || fixed);
+      const body = doubled ? nal.subarray(1) : nal;
+      if (doubled && nalType === 7) fixed = true;
+      out.push(body.length >> 8, body.length & 0xff, ...body);
+    }
+    return true;
+  };
+  const spsCount = record[5]! & 0x1f;
+  out.push(record[5]!);
+  at = 6;
+  if (!copySets(spsCount, 7) || at >= record.length) return record;
+  const ppsCount = record[at]!;
+  out.push(ppsCount);
+  at += 1;
+  if (!copySets(ppsCount, 8)) return record;
+  out.push(...record.subarray(at));
+  return fixed ? new Uint8Array(out) : record;
+}
+
 const bitrateFor = (w: number, h: number): number =>
   Math.round(Math.min(12_000_000, Math.max(2_000_000, w * h * 4)));
+
+function withRepairedAvcC(
+  meta: EncodedVideoChunkMetadata | undefined,
+): EncodedVideoChunkMetadata | undefined {
+  const d = meta?.decoderConfig?.description;
+  if (!meta?.decoderConfig || !d) return meta;
+  const bytes = ArrayBuffer.isView(d)
+    ? new Uint8Array(d.buffer, d.byteOffset, d.byteLength)
+    : new Uint8Array(d);
+  const repaired = repairAvcC(bytes);
+  return repaired === bytes
+    ? meta
+    : { ...meta, decoderConfig: { ...meta.decoderConfig, description: repaired } };
+}
 
 export async function exportVideo(req: ExportRequest): Promise<Blob> {
   const { engine, text, format, width, height, fps, signal, onProgress } = req;
@@ -99,8 +179,18 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
   }
 
   let failure: unknown;
+  // H.264 chunks are held until the encoder is flushed, so their timing can be fixed up first
+  const held: [EncodedVideoChunk, EncodedVideoChunkMetadata | undefined][] = [];
   const encoder = new VideoEncoder({
-    output: (chunk, meta) => (muxer as WebmMuxer<WebmTarget>).addVideoChunk(chunk, meta),
+    output: (chunk, meta) => {
+      // an error thrown here would be lost, so it fails the export instead
+      try {
+        if (format === "mp4") held.push([chunk, meta]);
+        else (muxer as WebmMuxer<WebmTarget>).addVideoChunk(chunk, meta);
+      } catch (e) {
+        failure ??= e;
+      }
+    },
     error: (e) => {
       failure = e;
     },
@@ -154,6 +244,17 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
     }
     await encoder.flush();
     if (failure) throw failure;
+    if (format === "mp4") {
+      const timing = h264Timing(held.map(([chunk]) => chunk.timestamp));
+      held.forEach(([chunk, meta], k) =>
+        (muxer as Mp4Muxer<Mp4Target>).addVideoChunk(
+          chunk,
+          withRepairedAvcC(meta),
+          timing[k]!.timestamp,
+          timing[k]!.compositionOffset,
+        ),
+      );
+    }
     muxer.finalize();
   } finally {
     if (encoder.state !== "closed") encoder.close();

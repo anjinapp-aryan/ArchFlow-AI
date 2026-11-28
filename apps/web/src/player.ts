@@ -78,6 +78,7 @@ export class Player {
     this.hiddenMarkers = portMarkerKeys(engineJson);
     this.cameraDoc = undefined;
     this.plan = undefined;
+    this.highlight = undefined;
     this.resetView();
     this.t = 0;
     this.requestRender();
@@ -236,6 +237,38 @@ export class Player {
     return { x: bx + (px - (cw - bw * k) / 2) / k, y: by + (py - (ch - bh * k) / 2) / k };
   }
 
+  // --- diagnostic highlight (playback only: never drawn into exports) -------------------------
+  /** Components (world rectangles) and connectors (world polylines) outlined on top of the frame. */
+  highlight:
+    | {
+        rects: { x: number; y: number; w: number; h: number }[];
+        paths: { x: number; y: number }[][];
+      }
+    | undefined;
+
+  setHighlight(h: Player["highlight"]): void {
+    this.highlight = h;
+    this.requestRender();
+  }
+
+  /** Manual view framing a world rectangle (with margin); the automatic camera is switched off. */
+  focusOn(r: { x: number; y: number; w: number; h: number }): void {
+    const info = this.engine.loaded;
+    if (!info) return;
+    const b = info.bounds;
+    const pad = 60;
+    const cw = this.canvas.clientWidth || 16;
+    const ch = this.canvas.clientHeight || 9;
+    // zoom 1 shows the whole diagram letterboxed into the canvas; zoom z shows 1/z of it
+    const fit = (w: number, h: number): number => Math.min(cw / w, ch / h);
+    const z = fit(r.w + 2 * pad, r.h + 2 * pad) / fit(b[2], b[3]);
+    this.autoCamera = false;
+    this.zoom = Math.min(Player.MAX_ZOOM, Math.max(1, z));
+    this.cx = r.x + r.w / 2;
+    this.cy = r.y + r.h / 2;
+    this.requestRender();
+  }
+
   resetView(): void {
     this.zoom = 1;
     const info = this.engine.loaded;
@@ -314,5 +347,52 @@ export class Player {
       },
       this.text,
     );
+    if (this.highlight) this.drawHighlight(ctx, w, h, this.currentBounds(info.bounds), dpr);
+  }
+
+  private drawHighlight(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    [bx, by, bw, bh]: Bounds,
+    dpr: number,
+  ): void {
+    // the painter's mapping: world bounds letterboxed into the canvas, centred
+    const k = Math.min(w / bw, h / bh);
+    const ox = (w - bw * k) / 2 - bx * k;
+    const oy = (h - bh * k) / 2 - by * k;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // the painter leaves its world transform set
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (const pass of [
+      { color: "rgba(255, 200, 61, 0.28)", width: 9 * dpr },
+      // dark under-stroke keeps the amber outline visible on light animation themes
+      { color: "rgba(27, 20, 0, 0.9)", width: 5 * dpr },
+      { color: "#ffc83d", width: 2.5 * dpr },
+    ]) {
+      ctx.strokeStyle = pass.color;
+      ctx.lineWidth = pass.width;
+      for (const r of this.highlight!.rects) {
+        const m = 6 * dpr;
+        ctx.beginPath();
+        ctx.roundRect(
+          r.x * k + ox - m,
+          r.y * k + oy - m,
+          r.w * k + 2 * m,
+          r.h * k + 2 * m,
+          10 * dpr,
+        );
+        ctx.stroke();
+      }
+      for (const pts of this.highlight!.paths) {
+        ctx.beginPath();
+        pts.forEach((pt, i) =>
+          i ? ctx.lineTo(pt.x * k + ox, pt.y * k + oy) : ctx.moveTo(pt.x * k + ox, pt.y * k + oy),
+        );
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 }
