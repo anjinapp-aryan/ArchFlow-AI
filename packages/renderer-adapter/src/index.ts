@@ -4,3 +4,5 @@ export * from "./connector-style.ts";
 export * from "./camera.ts";
 export * from "./themes.ts";
 export * from "./dim.ts";
+export * from "./summary.ts";
+export * from "./labels.ts";

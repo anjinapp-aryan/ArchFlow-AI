@@ -1,4 +1,5 @@
 title: AWS Application Load Balancer routing
+request: GET /api/orders
 Client -> ALB Listener 443 : HTTPS request
 ALB Listener 443 -> Rule Engine : evaluate rules by priority
 Rule Engine -> Auth TG : /auth* or host auth.app

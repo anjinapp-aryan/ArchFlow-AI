@@ -60,10 +60,29 @@ Further rules (AWS ALB quality pass):
 - Export plans for the video's aspect ratio. For the same aspect ratio, playback and export get identical bounds at every frame (unit-tested).
 
 **Limitation.** Everything active must stay visible, and frames must not cut anything. Diagrams with simultaneous activity across the whole diagram therefore stay mostly on the overview:
-- the AWS ALB example: health-check rounds run during the request;
+- the AWS ALB example: health-check rounds run during the request. Routed to one target group, the request takes about 7 s and overlaps both probe rounds, so no stop can be held for 1 s with its transitions. The example therefore plays on the overview, where adaptive labels keep the text readable;
 - broadcasts to many consumers.
 
 The camera then zooms only between those moments. Groups are not drawn by the engine (they are flattened), so group zoom frames the group's components without showing a container.
+
+## Ending summary held to the last frame
+
+Code: `packages/renderer-adapter/src/summary.ts`, the painter's `Framing.heldNotes`, and `apps/web/src/framing.ts` `heldNotes` (shared by playback and export).
+
+- **Problem.** The engine fades every note out over the last 12 % of its duration. A summary that lasts to the end therefore faded during the final 0.4 s.
+- **Fix.** `endingSummary(doc)` finds the note that starts after the last packet and timeout and lasts to the end. Once its fade-in is over, the painter draws that card, its accent bar and its text at full opacity, up to and including the last frame.
+- **Matching.** The painter recognises the three items by the engine's note geometry (`_DrawNote`).
+- **Scope.** Other notes keep the engine's fade. The engine and its display lists are unchanged.
+- **Test.** A browser test checks that on the final frame the summary region equals the fully visible card, and that frames while the card is fully visible are pixel-identical with or without the hold.
+
+## Adaptive connector labels
+
+Code: `packages/renderer-adapter/src/labels.ts`, the painter's `Framing.labelScale`, and `apps/web/src/framing.ts` `labelScaler`.
+
+- **Free space.** Each connector label gets a maximum scale, at most 1.5×. At that scale its box still touches no component, no other label and no other connector, and stays inside the diagram.
+- **Scaling.** When a label is smaller than 11 px on screen (CSS px), the painter enlarges it up to that maximum. Labels that are already readable, at camera stops or in 1080p, are drawn exactly as laid out.
+- **What does not change.** No label is hidden or shortened, and the layout is unchanged.
+- **Measurements.** `apps/web/test/readability.test.ts` checks the rules at 1280×720 and 1920×1080 and writes `artifacts/qa/label-readability.md`.
 
 ## Themes
 
@@ -99,7 +118,7 @@ Code: `packages/renderer-adapter/src/dim.ts`, adapter option `dimInactive`.
 
 | Tool | What it does |
 | --- | --- |
-| `npm run golden:sheet [-- --case aws-alb --times 0,7300]` | Contact sheet of recorded pixel goldens (case, scenario name, environment, timestamps) in `artifacts/contact-sheets/`. Reads goldens only; reproducible within one environment |
+| `npm run golden:sheet [-- --case aws-alb --times 0,7100]` | Contact sheet of recorded pixel goldens (case, scenario name, environment, timestamps) in `artifacts/contact-sheets/`. Reads goldens only; reproducible within one environment |
 | `packages/qa/test/temporal.browser.test.ts` | For every event of every golden case: one frame before it starts, the engine output equals the animation without that event; halfway through, it differs |
 | `apps/web/test/camera-check.ts` | Independent camera checks, sampled at 60 fps: components and packets (with labels) of every running event inside the frame, no jump (centre ≤ 12 % of the view per frame, zoom ≤ 6 %), zoom ≤ max, stops ≥ min dwell, one move at a time, starts and ends on the overview |
 | `apps/web/test/camera.browser.test.ts` | The same checks with the engine's own bounds; painter determinism; overview == no camera; camera golden `fixtures/golden/aws-alb/camera.json` (platform independent); review sheets |

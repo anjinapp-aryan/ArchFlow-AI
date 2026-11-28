@@ -8,13 +8,17 @@ import {
 } from "@archflow/engine-host";
 import type { CanonicalDocument } from "@archflow/canonical-model";
 import {
+  endingSummary,
+  labelBoosts,
   planCamera,
   type Bounds,
+  type EndingSummary,
+  type LabelBoost,
   type CameraOptions,
   type CameraPlan,
   type TitleMeasurer,
 } from "@archflow/renderer-adapter";
-import { aspectKey, cameraFrameBounds } from "./framing.ts";
+import { aspectKey, cameraFrameBounds, heldNotes, labelScaler } from "./framing.ts";
 
 /**
  * Interactive player: our own clock drives the WASM engine and our painter draws each frame,
@@ -137,6 +141,11 @@ export class Player {
 
   // --- automatic camera (shared with video export through cameraFrameBounds) ------------------
   private cameraDoc: CanonicalDocument | undefined;
+  /** Ending summary of the loaded animation: held on screen to the last frame (also in export). */
+  summary: EndingSummary | undefined;
+  /** Adaptive connector labels of the loaded animation (also used by export). */
+  labels: LabelBoost[] = [];
+  private scaler: { dpr: number; f: ReturnType<typeof labelScaler> } | undefined;
   private plan: { key: string; plan: CameraPlan } | undefined;
   private auto = true;
   cameraOptions: Partial<CameraOptions> = {};
@@ -146,6 +155,9 @@ export class Player {
   /** The canonical document of the loaded animation: the camera plans from it. */
   setCameraDocument(doc: CanonicalDocument): void {
     this.cameraDoc = doc;
+    this.summary = endingSummary(doc);
+    this.labels = labelBoosts(doc);
+    this.scaler = undefined;
     this.plan = undefined;
     this.requestRender();
   }
@@ -271,6 +283,12 @@ export class Player {
     this.autoCamera = false;
   }
 
+  private labelFn(dpr: number): ReturnType<typeof labelScaler> {
+    if (!this.scaler || this.scaler.dpr !== dpr)
+      this.scaler = { dpr, f: labelScaler(this.labels, dpr) };
+    return this.scaler.f;
+  }
+
   render(): void {
     const info = this.engine.loaded;
     const ctx = this.canvas.getContext("2d");
@@ -291,6 +309,8 @@ export class Player {
         bounds: this.currentBounds(info.bounds),
         background: info.background || "#0a111f",
         hiddenMarkers: this.hiddenMarkers,
+        heldNotes: heldNotes(this.summary, this.t),
+        ...(this.labelFn(dpr) ? { labelScale: this.labelFn(dpr)! } : {}),
       },
       this.text,
     );

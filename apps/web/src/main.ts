@@ -275,6 +275,8 @@ async function doExport(): Promise<void> {
         text: player.text,
         hiddenMarkers: player.hiddenMarkers,
         ...(camera ? { camera } : {}),
+        ...(player.summary ? { summary: player.summary } : {}),
+        labels: player.labels,
         format,
         width: w,
         height: h,

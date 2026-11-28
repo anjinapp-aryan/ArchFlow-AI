@@ -98,6 +98,17 @@ export interface Framing {
    * at every node port; ArchFlow uses ports only to anchor routed connectors, so they stay hidden.
    */
   hiddenMarkers?: ReadonlySet<string>;
+  /**
+   * Note cards (top-left corner, world coordinates) drawn at full opacity whatever the engine's
+   * fade says: ArchFlow holds the ending summary on screen to the last frame. The card, its
+   * accent bar and its text are recognised by the engine's note geometry (`_DrawNote`).
+   */
+  heldNotes?: readonly { x: number; y: number }[];
+  /**
+   * Scale for a connector label (centred text with a halo) at anchor (x, y), drawn `sizePx`
+   * device px high: ArchFlow enlarges small labels into the free space around them. 1 = as laid out.
+   */
+  labelScale?: (text: string, x: number, y: number, sizePx: number) => number;
 }
 
 const markerKey = (x: number, y: number): string => `${Math.round(x * 4)},${Math.round(y * 4)}`;
@@ -154,7 +165,8 @@ export function paintFrame(
     (cw - bounds[2] * k) / 2 - bounds[0] * k,
     (ch - bounds[3] * k) / 2 - bounds[1] * k,
   );
-  if (list.data.length > 0) drawItems(ctx, list, k, text, framing.hiddenMarkers);
+  if (list.data.length > 0)
+    drawItems(ctx, list, k, text, framing.hiddenMarkers, framing.heldNotes, framing.labelScale);
 }
 
 function drawItems(
@@ -163,8 +175,23 @@ function drawItems(
   deviceScale: number,
   text: BrowserText,
   hidden?: ReadonlySet<string>,
+  held?: readonly { x: number; y: number }[],
+  labelScale?: Framing["labelScale"],
 ): void {
   const data = list.data;
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.01;
+  /** Is the item whose geometry starts at `pos` part of a held note card? */
+  const isHeld = (tag: number): boolean => {
+    if (!held || held.length === 0) return false;
+    const x = data[pos]!;
+    const y = data[pos + 1]!;
+    for (const n of held) {
+      // card and accent bar: rectangles at the card's corner, 30 high; text: at (x + 14, y + 19)
+      if (tag === 1 && near(x, n.x) && near(y, n.y) && near(data[pos + 3]!, 30)) return true;
+      if (tag === 5 && near(x, n.x + 14) && near(y, n.y + 19)) return true;
+    }
+    return false;
+  };
   const strings = list.strings;
   let pos = 0;
 
@@ -298,7 +325,7 @@ function drawItems(
     let x = data[pos++]!;
     let y = data[pos++]!;
     const str = readString();
-    const size = data[pos++]!;
+    let size = data[pos++]!;
     const bold = data[pos++] !== 0;
     const family = readString();
     const align = data[pos++]!;
@@ -306,6 +333,14 @@ function drawItems(
     let halo: { color: number; width: number } | null = null;
     if (data[pos++] !== 0) halo = { color: data[pos++]!, width: data[pos++]! };
     if (!str || size <= 0) return;
+    // connector labels: centred both ways, with a halo
+    if (labelScale && halo && align === 1 && valign === 1) {
+      const f = labelScale(str, x, y, size * deviceScale);
+      if (f !== 1) {
+        size *= f;
+        halo = { color: halo.color, width: halo.width * f };
+      }
+    }
     const css = text.fontCss(bold, family);
     const k = size / REF_PX;
     const w = text.measure(str, bold, family) * k;
@@ -353,7 +388,7 @@ function drawItems(
       ctx.translate(-ox, -oy);
     }
     if (flags & 8) ctx.clip(readPath());
-    ctx.globalAlpha = Math.min(1, Math.max(0, opacity));
+    ctx.globalAlpha = isHeld(tag) ? 1 : Math.min(1, Math.max(0, opacity));
     let p: Path2D;
     switch (tag) {
       case 1:

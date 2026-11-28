@@ -21,6 +21,7 @@ import type { FailureSpec, SynthesisIssue, SynthesisOptions } from "./synthesize
  *   The API Gateway forwards the request to the Order Service.   (verb sentences)
  *   Consumer 1 consumes from Kafka.                              (consume = reverse, async)
  *   title: ...   entry: User   fail: Consumer 2 -> PostgreSQL timeout retries 2
+ *   request: GET /api/orders    (what the entry sends; rule routers match its path and host)
  *   monitor: ALB Health Check -> Order API, Payment API : GET /health every 30s
  *       (health checks / probes: periodic monitoring, never part of request routing; connectors
  *        labelled like a health check, or starting at a "health check"/"monitor" component, are
@@ -187,6 +188,10 @@ export function parseDescription(text: string): DescriptionResult {
     }
     if ((m = /^entry\s*:\s*(.+)$/i.exec(st))) {
       options.entry = clean(m[1]!);
+      continue;
+    }
+    if ((m = /^request\s*:\s*(.+)$/i.exec(st))) {
+      options.request = m[1]!.trim().slice(0, LIMITS.maxLabelLength);
       continue;
     }
     if (

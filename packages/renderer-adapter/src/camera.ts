@@ -215,7 +215,10 @@ function edgeFor(
 }
 
 /** Engine path of a connector (orthogonal: exact; otherwise the centre line). */
-function edgePath(doc: CanonicalDocument, e: CanonicalEdge): { pts: Point[]; exact: boolean } {
+export function edgePath(
+  doc: CanonicalDocument,
+  e: CanonicalEdge,
+): { pts: Point[]; exact: boolean } {
   const a = doc.diagram.nodes.find((n) => n.id === e.from)!;
   const b = doc.diagram.nodes.find((n) => n.id === e.to)!;
   if (e.routing === "orthogonal" && (e.waypoints?.length ?? 0) > 0)

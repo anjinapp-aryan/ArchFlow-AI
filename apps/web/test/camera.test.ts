@@ -79,10 +79,13 @@ describe("automatic camera: large diagrams", () => {
     const p = plan(doc);
     expect(checkCamera(doc, p)).toEqual(noIssues);
     // the layout is ~3:1 and fills a 16:9 frame's width: the camera zooms only where a frame cuts
-    // nothing and keeps the next hop (target-group selection and backends), and never on the
-    // left side while the response returns (the regression that clipped the backend)
+    // nothing and keeps the next hop, and never on the left side while the response returns (the
+    // regression that clipped the backend). Routed to one target group, the request is short and
+    // overlaps both health-check rounds: no stop can be held 1 s with its transitions, so with the
+    // unchanged rules the ALB plays on the overview (labels are enlarged there instead)
     const stops = p.segments.filter((s) => s.kind === "hold" && !s.overview);
-    expect(stops.length).toBeGreaterThanOrEqual(1);
+    expect(stops).toEqual([]);
+    expect(p.reason).toBe("nothing gains enough zoom over the overview");
     const response = doc.scenario!.events.find(
       (e) => e.type === "packet" && e.variant === "response" && e.to === "client",
     )!;

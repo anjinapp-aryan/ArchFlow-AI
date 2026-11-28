@@ -27,6 +27,11 @@ import { NOTE_H, diagramBox, noteObstacles, noteWidth, placeNote } from "./notes
  *   periodic probe rounds, independent of request timing. Each probe is answered "healthy"
  *   (success) or, when a failure is injected on that connector, times out / errors and marks
  *   the target "unhealthy". Intervals written in labels ("every 30s") are kept as text only.
+ * - Routing components choose ONE outgoing call per request instead of calling every callee:
+ *   rule routers (connector labels state conditions: path patterns like `/api/*`, `host x`,
+ *   `default`) pick the first connector, in document order (rule priority), whose condition
+ *   matches the request (`request` option), else the default rule; balancers (load balancers,
+ *   target groups, "round-robin" connectors) pick the next healthy target.
  * - Explicit `response` connectors carry the responses of the call they answer.
  * - No randomness, no clock: same diagram + options = same scenario.
  */
@@ -51,14 +56,91 @@ export interface SynthesisOptions {
   packetMs?: number;
   gapMs?: number;
   timeoutMs?: number;
+  /**
+   * The request the entry sends, e.g. `GET /api/orders` or `https://auth.app/login`. Rule
+   * routers match its path and host against their connector conditions. Without it, a rule
+   * router takes its default rule (reported).
+   */
+  request?: string;
+}
+
+/** Connector conditions of a rule router: path patterns, host patterns, default rule. */
+export interface RouteRule {
+  paths: string[];
+  hosts: string[];
+  isDefault: boolean;
+}
+const PATH_TOKEN = /(?:^|[\s(,;])(\/[^\s,;)]*)/g;
+const HOST_TOKEN = /\bhost(?:\s+header)?\s*[:=]?\s*([^\s,;)]+)/gi;
+const DEFAULT_WORD = /\b(default|fallback|catch[\s-]*all|otherwise)\b/i;
+const BALANCE_WORD =
+  /\b(round[\s-]*robin|weighted|least[\s-]*(?:conn\w*|outstanding\w*)|healthy\s+targets?|load[\s-]*balanc\w*)\b/i;
+const BALANCER_NAME =
+  /\b(load[\s-]*balancers?|[ae]lb|nlb|target[\s-]*groups?|tg|reverse[\s-]*proxy)\b/i;
+
+/** The condition a connector label states (empty when it states none). */
+export function parseRouteRule(label: string | undefined): RouteRule {
+  const s = label ?? "";
+  const paths = [...s.matchAll(PATH_TOKEN)].map((m) => m[1]!).filter((p) => p.length > 0);
+  const hosts = [...s.matchAll(HOST_TOKEN)].map((m) => m[1]!.toLowerCase());
+  return {
+    paths,
+    hosts,
+    isDefault: paths.length === 0 && hosts.length === 0 && DEFAULT_WORD.test(s),
+  };
+}
+
+const glob = (pattern: string, caseless: boolean): RegExp =>
+  new RegExp(
+    `^${pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".")}$`,
+    caseless ? "i" : "",
+  );
+
+/** Path and host of a request (`GET /api/orders`, `https://auth.app/login`, `/x host a.b`). */
+export function parseRequest(request: string): { path?: string; host?: string } {
+  const url = /\b[a-z][a-z0-9+.-]*:\/\/([^/\s]+)(\/\S*)?/i.exec(request);
+  if (url) return { host: url[1]!.toLowerCase(), path: url[2] ?? "/" };
+  const path = /(?:^|\s)(\/\S*)/.exec(request)?.[1];
+  const host = /\bhost\s*[:=]?\s*(\S+)/i.exec(request)?.[1]?.toLowerCase();
+  return { ...(path ? { path } : {}), ...(host ? { host } : {}) };
+}
+
+/**
+ * Does a connector condition match the request? Path patterns are case-sensitive, host
+ * patterns are not (as in ALB listener rules); `*` and `?` are wildcards. A label naming
+ * several conditions ("/auth* or host auth.app") matches when any of them does.
+ */
+export function ruleMatches(rule: RouteRule, req: { path?: string; host?: string }): boolean {
+  return (
+    (req.path !== undefined && rule.paths.some((p) => glob(p, false).test(req.path!))) ||
+    (req.host !== undefined && rule.hosts.some((h) => glob(h, true).test(req.host!)))
+  );
 }
 
 export interface SynthesisIssue {
   code: string;
   message: string;
 }
+/** One routing decision: router `router` sent the request of `flowId` to `to` only. */
+export interface RoutingDecision {
+  router: string;
+  to: string;
+  edgeId: string;
+  flowId: string;
+  /** `rule`: a condition matched; `default`: default (or first) rule; `balance`: next healthy target. */
+  how: "rule" | "default" | "balance";
+  t: number;
+}
 export type SynthesisResult =
-  | { ok: true; document: CanonicalDocument; warnings: SynthesisIssue[] }
+  | {
+      ok: true;
+      document: CanonicalDocument;
+      warnings: SynthesisIssue[];
+      routing: RoutingDecision[];
+    }
   | { ok: false; errors: SynthesisIssue[] };
 
 const QUEUE_RE =
@@ -232,9 +314,15 @@ export function synthesizeScenario(
     const calls = out.filter((h) => (seen.has(h.to) ? false : (seen.add(h.to), true)));
     let cur = t;
     const asyncCalls = calls.filter((c) => isAsync(n, c.to, c.edge));
-    const syncCalls = calls.filter((c) => !isAsync(n, c.to, c.edge));
     const unhealthyAt = (id: string, at: number): boolean =>
       (unhealthySince.get(id) ?? Number.POSITIVE_INFINITY) <= at;
+    const syncCalls = route(
+      n,
+      calls.filter((c) => !isAsync(n, c.to, c.edge)),
+      cur,
+      flow,
+      unhealthyAt,
+    );
     for (const c of syncCalls) {
       // like a load balancer: skip a target known to be unhealthy while a healthy one remains
       if (unhealthyAt(c.to, cur) && syncCalls.some((o) => o !== c && !unhealthyAt(o.to, cur))) {
@@ -268,6 +356,92 @@ export function synthesizeScenario(
       cur += packetMs + gapMs; // the publisher continues once its message is out
     }
     return cur;
+  };
+
+  type Hop = { to: string; edge: CanonicalEdge };
+  /** How a component routes: rule router, balancer, or none (it calls every callee in turn). */
+  const routeKind = (n: string, calls: Hop[]): "rules" | "balance" | undefined => {
+    if (calls.length < 2) return undefined;
+    const rules = calls.map((c) => parseRouteRule(c.edge.label));
+    if (rules.some((r) => r.paths.length > 0 || r.hosts.length > 0 || r.isDefault)) return "rules";
+    if (
+      calls.some((c) => BALANCE_WORD.test(c.edge.label ?? "")) ||
+      BALANCER_NAME.test(byId.get(n)!.label)
+    )
+      return "balance";
+    return undefined;
+  };
+  const request = options.request !== undefined ? parseRequest(options.request) : undefined;
+  const routeWarned = new Set<string>();
+  /** Every routing decision taken (reported with the result). */
+  const routing: RoutingDecision[] = [];
+  /** Next target per balancer (round-robin across requests). */
+  const turn = new Map<string, number>();
+  /** The calls a component makes for this request: one for routers, all for other components. */
+  const route = (
+    n: string,
+    calls: Hop[],
+    t: number,
+    flow: string,
+    unhealthyAt: (id: string, at: number) => boolean,
+  ): Hop[] => {
+    const kind = routeKind(n, calls);
+    if (!kind) return calls;
+    const router = byId.get(n)!;
+    if (kind === "rules") {
+      const rules = calls.map((c) => ({ c, rule: parseRouteRule(c.edge.label) }));
+      const matched = request ? rules.find((r) => ruleMatches(r.rule, request)) : undefined;
+      const chosen =
+        matched ?? rules.find((r) => r.rule.isDefault) ?? (request ? undefined : rules[0]);
+      if (!request && !routeWarned.has(n)) {
+        routeWarned.add(n);
+        warnings.push({
+          code: "synth.route_default",
+          message: `no request given (request: GET /path): "${router.label}" sends it to "${byId.get(chosen!.c.to)!.label}" (${chosen!.rule.isDefault ? "default rule" : "first rule"})`,
+        });
+      }
+      if (!chosen) {
+        warnings.push({
+          code: "synth.no_rule_matched",
+          message: `no rule of "${router.label}" matches "${options.request}" and there is no default rule`,
+        });
+        note(`${router.label}: no rule matches`.slice(0, 500), t, 1600, flow, router);
+        return [];
+      }
+      const cond = matched
+        ? [...chosen.rule.paths, ...chosen.rule.hosts.map((h) => `host ${h}`)].join(" or ")
+        : chosen.rule.isDefault
+          ? "default rule"
+          : "first rule";
+      routing.push({
+        router: n,
+        to: chosen.c.to,
+        edgeId: chosen.c.edge.id,
+        flowId: flow,
+        how: matched ? "rule" : "default",
+        t,
+      });
+      note(`${cond} → ${byId.get(chosen.c.to)!.label}`.slice(0, 500), t, 1600, flow, router);
+      return [chosen.c];
+    }
+    // balancer: the next target in turn that is healthy (none healthy: fail open, use it anyway)
+    const k = turn.get(n) ?? 0;
+    const order = calls.map((_, i) => calls[(k + i) % calls.length]!);
+    const chosen = order.find((c) => !unhealthyAt(c.to, t)) ?? order[0]!;
+    for (const c of order) {
+      if (c === chosen) break;
+      skipped(c.to, t, flow);
+    }
+    turn.set(n, (calls.indexOf(chosen) + 1) % calls.length);
+    routing.push({
+      router: n,
+      to: chosen.to,
+      edgeId: chosen.edge.id,
+      flowId: flow,
+      how: "balance",
+      t,
+    });
+    return [chosen];
   };
 
   /** Warn intervals per node (a caller waiting on a failed call). */
@@ -418,7 +592,10 @@ export function synthesizeScenario(
     skippedTargets.add(target);
     note(`${n.label} skipped: unhealthy`.slice(0, 500), t, 1600, flow, n);
   };
-  const mainFlow = newFlow(`${byId.get(entry!)!.label} request`);
+  const mainFlow = newFlow(
+    `${byId.get(entry!)!.label} request${options.request ? ` ${options.request}` : ""}`,
+  );
+  if (options.request) note(options.request.slice(0, 500), start, 1600, mainFlow, byId.get(entry!));
   const end = visit(entry!, start, mainFlow, new Set([entry!]));
   if (truncated)
     warnings.push({
@@ -614,8 +791,24 @@ export function synthesizeScenario(
         code: "synth.failure_not_reached",
         message: "a requested failure is on a call the traffic never makes",
       });
+  // components a router could send to, but this request does not use, are not "unreached"
+  const reachable = new Set<string>([entry!]);
+  for (let todo = [entry!]; todo.length > 0;) {
+    const n = todo.pop()!;
+    for (const h of hops.get(n) ?? [])
+      if (!reachable.has(h.to)) {
+        reachable.add(h.to);
+        todo.push(h.to);
+      }
+  }
+  const notTaken = nodes.filter((n) => !reached.has(n.id) && reachable.has(n.id));
+  if (notTaken.length > 0 && routing.length > 0)
+    warnings.push({
+      code: "info.routes_not_taken",
+      message: `this request is routed past ${notTaken.map((n) => `"${n.label}"`).join(", ")} (other rules or targets)`,
+    });
   for (const n of nodes)
-    if (!reached.has(n.id))
+    if (!reached.has(n.id) && !(routing.length > 0 && reachable.has(n.id)))
       warnings.push({
         code: "synth.unreached",
         message: `"${n.label}" receives no traffic from the entry component`,
@@ -653,6 +846,7 @@ export function synthesizeScenario(
   return {
     ok: true,
     document: v.value,
+    routing,
     warnings: [
       ...warnings,
       ...v.warnings.map((w) => ({ code: `validation.${w.code}`, message: w.message })),

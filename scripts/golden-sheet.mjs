@@ -3,7 +3,7 @@
 //
 //   npm run golden:sheet                          every golden case, this environment
 //   npm run golden:sheet -- --case aws-alb        one case
-//   npm run golden:sheet -- --case aws-alb --times 0,7300,16500
+//   npm run golden:sheet -- --case aws-alb --times 0,7100,11400
 //   npm run golden:sheet -- --env win32-x64-chrome158 --out some/dir
 //
 // Writes <out>/<case>-<env>.png (default out: artifacts/contact-sheets, git-ignored). Reads the
@@ -41,7 +41,7 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 if (opt.times?.some((t) => !Number.isFinite(t))) {
-  console.error("--times takes comma-separated milliseconds, e.g. 0,7300");
+  console.error("--times takes comma-separated milliseconds, e.g. 0,7100");
   process.exit(2);
 }
 

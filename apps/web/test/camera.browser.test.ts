@@ -6,12 +6,18 @@ import type { Browser, Page } from "puppeteer-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CanonicalDocument } from "@archflow/canonical-model";
 import {
+  LABEL_MIN_PX,
   cameraBoundsAt,
+  endingSummary,
+  heldNotesAt,
+  labelBoosts,
+  labelScale,
   planCamera,
   serializeEngineDocument,
   toEngineDocument,
   type Bounds,
   type CameraPlan,
+  type LabelBoost,
 } from "@archflow/renderer-adapter";
 import {
   GOLDEN_CASES,
@@ -87,14 +93,36 @@ async function engineBounds(json: string): Promise<{ bounds: Bounds; durationMs:
   }, json);
 }
 
+interface Shot {
+  t: number;
+  bounds: Bounds;
+  /** Note cards held at full opacity (the app's ending-summary layer). */
+  held?: readonly { x: number; y: number }[];
+  /** Adaptive labels: boosts with the scale the app's framing helper gives at this zoom. */
+  labels?: (LabelBoost & { scale: number })[];
+  /** Device-pixel region to hash separately: x, y, w, h. */
+  region?: [number, number, number, number];
+}
+/** The scale the app applies to each label in a frame painted at `bounds` (1280x720). */
+const labelsAt = (
+  boosts: LabelBoost[],
+  bounds: Bounds,
+  size = { width: 1280, height: 720 },
+): (LabelBoost & { scale: number })[] => {
+  const k = Math.min(size.width / bounds[2], size.height / bounds[3]);
+  return boosts.map((b) => ({ ...b, scale: labelScale(b, 12 * k, LABEL_MIN_PX) }));
+};
+
 /** Paint frames with ArchFlow's painter (browser fonts) at the given bounds; PNG + pixel hash. */
 async function paint(
   json: string,
-  shots: { t: number; bounds: Bounds }[],
+  shots: Shot[],
   size = { width: 1280, height: 720 },
-): Promise<{ hash: string; png: Buffer }[]> {
+): Promise<
+  { hash: string; png: Buffer; region?: string; labelsDrawn: string[]; labelsMatched: string[] }[]
+> {
   const raw = await page.evaluate(
-    async (j: string, list: { t: number; bounds: Bounds }[], w: number, h: number) => {
+    async (j: string, list: Shot[], w: number, h: number) => {
       type Host = {
         EngineHost: {
           create(
@@ -125,8 +153,27 @@ async function paint(
       c.height = h;
       const ctx = c.getContext("2d", { willReadFrequently: true })!;
       const hidden = H.portMarkerKeys(j);
-      const out: { rgba: number; png: string }[] = [];
+      const out: {
+        rgba: number;
+        png: string;
+        region?: string;
+        labelsDrawn: string[];
+        labelsMatched: string[];
+      }[] = [];
       for (const s of list) {
+        const drawn: string[] = [];
+        const matched: string[] = [];
+        // the same matching rule as apps/web/src/framing.ts labelScaler
+        const labelScale = s.labels
+          ? (str: string, x: number, y: number): number => {
+              drawn.push(str);
+              const b = s.labels!.find(
+                (c) => c.text === str && Math.abs(c.cx - x) <= c.w / 2 && Math.abs(c.cy - y) <= c.h,
+              );
+              if (b) matched.push(str);
+              return b ? b.scale : 1;
+            }
+          : undefined;
         H.paintFrame(
           ctx,
           host.frame(s.t),
@@ -136,13 +183,30 @@ async function paint(
             bounds: s.bounds,
             background: host.loaded.background || "#0a111f",
             hiddenMarkers: hidden,
+            ...(s.held ? { heldNotes: s.held } : {}),
+            ...(labelScale ? { labelScale } : {}),
           },
           text,
         );
+        const hash = (d: Uint8ClampedArray): string => {
+          let x = 0x811c9dc5;
+          for (let i = 0; i < d.length; i++) x = Math.imul(x ^ d[i]!, 0x01000193);
+          return String(x >>> 0);
+        };
         const d = ctx.getImageData(0, 0, w, h).data;
-        let x = 0x811c9dc5;
-        for (let i = 0; i < d.length; i++) x = Math.imul(x ^ d[i]!, 0x01000193);
-        out.push({ rgba: x >>> 0, png: c.toDataURL("image/png").split(",")[1] ?? "" });
+        out.push({
+          rgba: Number(hash(d)),
+          png: c.toDataURL("image/png").split(",")[1] ?? "",
+          ...(s.region
+            ? {
+                region: hash(
+                  ctx.getImageData(s.region[0], s.region[1], s.region[2], s.region[3]).data,
+                ),
+              }
+            : {}),
+          labelsDrawn: drawn,
+          labelsMatched: matched,
+        });
       }
       return out;
     },
@@ -151,7 +215,13 @@ async function paint(
     size.width,
     size.height,
   );
-  return raw.map((r) => ({ hash: String(r.rgba), png: Buffer.from(r.png, "base64") }));
+  return raw.map((r) => ({
+    hash: String(r.rgba),
+    png: Buffer.from(r.png, "base64"),
+    ...(r.region !== undefined ? { region: r.region } : {}),
+    labelsDrawn: r.labelsDrawn,
+    labelsMatched: r.labelsMatched,
+  }));
 }
 
 function largePlatform(): string {
@@ -257,9 +327,10 @@ describe("automatic camera with the real engine", () => {
     const c = GOLDEN_CASES.find((x) => x.id === "aws-alb")!;
     const doc = fixture(c.file);
     const { plan } = await planned(doc);
-    const times = [...new Set([...c.times, ...Array.from({ length: 37 }, (_, i) => i * 500)])].sort(
-      (a, b) => a - b,
-    );
+    const steps = Math.floor(doc.scenario!.durationMs / 500) + 1;
+    const times = [
+      ...new Set([...c.times, ...Array.from({ length: steps }, (_, i) => i * 500)]),
+    ].sort((a, b) => a - b);
     const actual = {
       schema: "archflow/golden-camera@1",
       fixture: c.id,
@@ -302,16 +373,20 @@ export function albMoments(doc: CanonicalDocument): { label: string; t: number }
         (variant === undefined || e.variant === variant),
     );
   const down = ev.find((e) => e.type === "node_state" && e.state === "down");
+  // the last probe round: health checks while the request is being answered
+  const probes = ev.filter(
+    (e) => e.type === "packet" && e.variant === "probe" && e.to === "order-api",
+  );
   return [
     { label: "1 initial overview", t: 0 },
     { label: "2 Client → ALB", t: mid(pkt("client", "alb-listener-443")) },
     { label: "3 ALB → Rule Engine", t: mid(pkt("alb-listener-443", "rule-engine", "request")) },
     { label: "4 target group selection", t: mid(pkt("rule-engine", "api-tg", "request")) },
     { label: "5 backend processing", t: mid(pkt("api-tg", "payment-api", "request")) },
-    { label: "6 health-check probes", t: mid(pkt("alb-health-check", "order-api")) },
+    { label: "6 health-check probes", t: mid(probes.at(-1)) },
     { label: "6b target unhealthy", t: down ? down.t + 300 : 0 },
     { label: "6c response back to Client", t: mid(pkt("alb-listener-443", "client")) },
-    { label: "7 final overview", t: doc.scenario!.durationMs - 100 },
+    { label: "7 final frame (summary)", t: doc.scenario!.durationMs },
   ];
 }
 
@@ -320,9 +395,19 @@ describe("AWS ALB benchmark sheet", () => {
     const doc = fixture("aws-alb.canonical.json");
     const { json, plan } = await planned(doc);
     const moments = albMoments(doc);
+    const summary = endingSummary(doc);
+    const boosts = labelBoosts(doc);
     const shots = await paint(
       json,
-      moments.map((m) => ({ t: m.t, bounds: cameraBoundsAt(plan, m.t) })),
+      moments.map((m) => {
+        const bounds = cameraBoundsAt(plan, m.t);
+        return {
+          t: m.t,
+          bounds,
+          held: heldNotesAt(summary, m.t),
+          labels: labelsAt(boosts, bounds),
+        };
+      }),
     );
     const png = await renderContactSheet(browser, {
       title: `aws-alb benchmark — ${process.env["ARCHFLOW_SHEET_TAG"] ?? "current"}`,
@@ -342,5 +427,80 @@ describe("AWS ALB benchmark sheet", () => {
       join(sheetDir, `aws-alb-benchmark-${process.env["ARCHFLOW_SHEET_TAG"] ?? "current"}.png`),
       png,
     );
+
+    // before/after: the previous version (artifacts/alb-before, saved from the last commit) and
+    // this one, moment by moment, same 1280x720 viewport and camera rules
+    const beforeFile = join(root, "artifacts", "alb-before", "aws-alb.canonical.json");
+    if (!existsSync(beforeFile)) return;
+    const old = JSON.parse(readFileSync(beforeFile, "utf8")) as CanonicalDocument;
+    const before = await planned(old);
+    const oldMoments = albMoments(old);
+    const oldShots = await paint(
+      before.json,
+      oldMoments.map((m) => ({ t: m.t, bounds: cameraBoundsAt(before.plan, m.t) })),
+    );
+    const frames = moments.flatMap((m, i) => [
+      {
+        t: oldMoments[i]!.t,
+        png: oldShots[i]!.png,
+        width: 1280,
+        height: 720,
+        label: `BEFORE · ${oldMoments[i]!.label} · t = ${(oldMoments[i]!.t / 1000).toFixed(2)} s`,
+      },
+      {
+        t: m.t,
+        png: shots[i]!.png,
+        width: 1280,
+        height: 720,
+        label: `AFTER · ${m.label} · t = ${(m.t / 1000).toFixed(2)} s`,
+      },
+    ]);
+    const cmp = await renderContactSheet(browser, {
+      title: "aws-alb — before (left) / after (right)",
+      subtitle:
+        "1280×720, automatic camera · after: one target group per request, summary held to the last frame, adaptive labels",
+      frames,
+      columns: 2,
+      cellWidth: 640,
+    });
+    writeFileSync(join(sheetDir, "aws-alb-before-after.png"), cmp);
+  });
+
+  it("the app's layers: every connector label matched, summary held through the final frame", async () => {
+    const doc = fixture("aws-alb.canonical.json");
+    const { json, plan } = await planned(doc);
+    const s = endingSummary(doc)!;
+    const end = doc.scenario!.durationMs;
+    const boosts = labelBoosts(doc);
+    // summary card in device px (the camera is on the overview during the summary)
+    const b = cameraBoundsAt(plan, end);
+    expect(b).toEqual(plan.overview);
+    const k = Math.min(1280 / b[2], 720 / b[3]);
+    const ox = (1280 - b[2] * k) / 2 - b[0] * k;
+    const oy = (720 - b[3] * k) / 2 - b[1] * k;
+    const region: [number, number, number, number] = [
+      Math.max(0, Math.floor(s.x * k + ox)),
+      Math.max(0, Math.floor(s.y * k + oy)),
+      Math.ceil(200 * k),
+      Math.ceil(30 * k),
+    ];
+    const mid = Math.round((s.t0 + s.t1) / 2);
+    const r = await paint(json, [
+      { t: mid, bounds: b, region },
+      { t: mid, bounds: b, region, held: heldNotesAt(s, mid) },
+      { t: end, bounds: b, region },
+      { t: end, bounds: b, region, held: heldNotesAt(s, end) },
+      { t: 0, bounds: b, labels: labelsAt(boosts, b) },
+      { t: 0, bounds: b },
+    ]);
+    // fully faded in: the hold changes nothing; on the final frame the engine has faded the card
+    // out, the hold shows it exactly as it was while fully visible
+    expect(r[1]!.hash).toBe(r[0]!.hash);
+    expect(r[2]!.region).not.toBe(r[0]!.region);
+    expect(r[3]!.region).toBe(r[0]!.region);
+    // every connector label the engine draws is found by the label layer, and enlarged
+    expect(r[4]!.labelsDrawn.length).toBeGreaterThan(0);
+    expect(r[4]!.labelsMatched).toEqual(r[4]!.labelsDrawn);
+    expect(r[4]!.hash).not.toBe(r[5]!.hash);
   });
 });

@@ -184,7 +184,9 @@ describe("web app (production build)", () => {
   }, 120_000);
 
   it("auto camera: on by default, frames differ from the overview, a manual zoom switches it off", async () => {
-    await page.select("#examples", "aws-alb");
+    // the order-flow example zooms (the AWS ALB example now plays on the overview: its single
+    // routed request overlaps both health-check rounds, see camera.test.ts)
+    await page.select("#examples", "bench-text");
     await page.waitForFunction(
       () => !(document.querySelector("#animate") as HTMLButtonElement).disabled,
     );

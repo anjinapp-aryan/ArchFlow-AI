@@ -94,7 +94,8 @@ describe("health checks", () => {
 
   it("is deterministic and warning-free apart from the reported inference", () => {
     expect(JSON.stringify(run(ALB).doc)).toBe(JSON.stringify(doc));
-    expect(warnings).toEqual(["text.monitoring_inferred"]);
+    // the rule engine sends this request to one target group only: the others are reported
+    expect(warnings).toEqual(["text.monitoring_inferred", "info.routes_not_taken"]);
   });
 
   it("warns when retries are asked for on a health check", () => {
@@ -208,17 +209,21 @@ describe("health checks", () => {
         (p) => p.from === id("API TG") && p.to === id("Payment API") && p.variant === "request",
       );
       expect(toPayment.length).toBe(1);
-      // the ending summary is a note too; the skip notes are the others
-      const notes = doc.scenario!.events.filter((e) => e.type === "note" && !/^(✓|✗)/.test(e.text));
+      // the other notes: the request, the matched rule and the ending summary
+      const notes = doc.scenario!.events.filter((e) => e.type === "note");
       expect(notes.map((n) => (n.type === "note" ? n.text : ""))).toEqual([
+        "GET /api/orders",
+        "/api/* → API TG",
         "Order API skipped: unhealthy",
+        "✓ Success: Client received its response · unhealthy: Order API (traffic routed around it)",
       ]);
-      expect(notes[0]!.t).toBeGreaterThanOrEqual(firstUnhealthy);
+      expect(notes[2]!.t).toBeGreaterThanOrEqual(firstUnhealthy);
     });
 
     it("still sends traffic when no healthy alternative remains", () => {
+      // GET / takes the default rule to Web TG, whose only target is Frontend ECS
       const { doc: d } = run(
-        ALB.replace(
+        ALB.replace("request: GET /api/orders", "request: GET /").replace(
           "fail: ALB Health Check -> Order API timeout retries 1",
           "fail: ALB Health Check -> Frontend ECS timeout",
         ),
@@ -230,7 +235,7 @@ describe("health checks", () => {
       );
     });
 
-    it("without a failing health check, every target gets traffic", () => {
+    it("without a failing health check, the first target in turn gets the request", () => {
       const { doc: d } = run(
         ALB.replace("fail: ALB Health Check -> Order API timeout retries 1", ""),
       );

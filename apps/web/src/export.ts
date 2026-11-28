@@ -1,8 +1,8 @@
 import { ArrayBufferTarget as WebmTarget, Muxer as WebmMuxer } from "webm-muxer";
 import { ArrayBufferTarget as Mp4Target, Muxer as Mp4Muxer } from "mp4-muxer";
 import { paintFrame, type BrowserText, type EngineHost } from "@archflow/engine-host";
-import type { CameraPlan } from "@archflow/renderer-adapter";
-import { cameraFrameBounds } from "./framing.ts";
+import type { CameraPlan, EndingSummary, LabelBoost } from "@archflow/renderer-adapter";
+import { cameraFrameBounds, heldNotes, labelScaler } from "./framing.ts";
 
 /**
  * Video export on the user's device. Frames are rendered directly from the engine (no screen
@@ -22,6 +22,10 @@ export interface ExportRequest {
   hiddenMarkers?: ReadonlySet<string>;
   /** Automatic camera planned for this video's aspect ratio (same plan logic as playback). */
   camera?: CameraPlan;
+  /** Ending summary held to the last frame (same rule as playback). */
+  summary?: EndingSummary;
+  /** Adaptive connector labels (same rule as playback; video px are device px). */
+  labels?: readonly LabelBoost[];
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
 }
@@ -119,6 +123,7 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
     background: info.background || "#0a111f",
     ...(req.hiddenMarkers ? { hiddenMarkers: req.hiddenMarkers } : {}),
   };
+  const labelScale = labelScaler(req.labels ?? []);
   try {
     for (let i = 0; i < total; i++) {
       if (signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
@@ -127,7 +132,12 @@ export async function exportVideo(req: ExportRequest): Promise<Blob> {
       paintFrame(
         ctx,
         engine.frame(t),
-        { ...framing, bounds: cameraFrameBounds(info.bounds, req.camera, t) },
+        {
+          ...framing,
+          bounds: cameraFrameBounds(info.bounds, req.camera, t),
+          heldNotes: heldNotes(req.summary, t),
+          ...(labelScale ? { labelScale } : {}),
+        },
         text,
       );
       const frame = new VideoFrame(canvas, {

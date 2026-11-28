@@ -18,6 +18,7 @@ The synthesizer turns any canonical diagram into an animation scenario, using de
 | Packet labels | A generated packet carries a label only when its connector has none ("request", "event"), plus status words such as retry, ok, healthy and unhealthy. The engine draws a packet's label just above the moving packet, so repeating the connector's label would only cover it |
 | Notes | A note is placed where it covers no component, no connector label and no note shown at the same time, and stays within 60 px of the diagram so the engine's frame shows it (`notes.ts`) |
 | Ending | After all traffic, a summary note on the whole diagram states the outcome in words: "✓ Success: <entry> received its response", recovered failures ("B → C: timeout, recovered after 2 retries"), unhealthy targets; "✗ Failed: …" when the entry got no answer; "✓ Done: every message was delivered" for message-only flows. The entry's final state and unhealthy targets are held to the end, and the animation ends with the summary |
+| Routing | A routing component sends each request to ONE callee, not to every callee in turn. **Rule routers**: the connector labels state conditions, either path patterns (`/api/*`, `/auth*`), host patterns (`host auth.app`) or a default rule (`default`, `fallback`, `catch-all`, `otherwise`). The first connector in document order (the rule priority) whose condition matches the request (`request:`) wins, otherwise the default rule. Path patterns are case-sensitive and host patterns are not, as in ALB listener rules. Without a `request:`, the default rule is used and reported (`synth.route_default`). When nothing matches and there is no default rule, the request stops at the router (`synth.no_rule_matched`). **Balancers**: load balancers, target groups, or connectors labelled "round-robin", "weighted", "least connections" or "healthy targets". They pick the next target in turn that is healthy, and skipped unhealthy targets get a note. When no target is healthy, they fail open. A note shows the request and the matched rule. Components the request is routed past are reported once (`info.routes_not_taken`), not as unreached. Every decision is returned in `routing` |
 | Explicit responses | When a `response` connector is drawn from the callee back to the caller, responses travel on it |
 | End | The entry component turns `success` when its response arrives |
 | Timing | 800 ms per packet, 200 ms gaps, 1.5 s timeouts (all configurable) |
@@ -35,6 +36,7 @@ Order Service ..> Kafka : OrderCreated        ..> = asynchronous (dotted, animat
 Kafka ..> Consumer 1, Consumer 2 : consume    ","  = fan-out / fan-in
 A <-> B    A -- B    A <- B                   both ways / no arrow / reversed
 entry: User
+request: GET /api/orders                      what the entry sends; rule routers match its path and host
 fail: Consumer 1 -> PostgreSQL timeout retries 1
 monitor: ALB Health Check -> Order API, Payment API : GET /health every 30s
 ```

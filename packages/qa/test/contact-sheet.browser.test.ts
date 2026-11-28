@@ -73,8 +73,8 @@ describe("golden contact sheet", () => {
 
   it("selects only the requested instants and refuses unknown ones", (ctx) => {
     try {
-      const src = goldenSheetSource(root, "aws-alb", envId, [0, 7300]);
-      expect(src.spec.frames.map((f) => f.t)).toEqual([0, 7300]);
+      const src = goldenSheetSource(root, "aws-alb", envId, [0, 7100]);
+      expect(src.spec.frames.map((f) => f.t)).toEqual([0, 7100]);
     } catch (e) {
       ctx.skip(`no aws-alb pixel goldens for ${envId}: ${(e as Error).message}`);
       return;
